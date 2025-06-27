@@ -1,0 +1,37 @@
+[
+    {
+        "id": "1",
+        "title": "Meeting Reminder: Project X",
+        "sender": "meeting@example.com",
+        "date": "10-07-2025 09:34:00",
+        "content": "Don't forget our meeting at 14AM 10-07-2025 to discuss Project X. We meet in our Dubai office."
+    },
+    {
+        "id": "2",
+        "title": "Weekly Report",
+        "sender": "reports@example.com",
+        "date": "10-07-2025 10:30:00",
+        "content": "Please find attached the weekly report."
+    },
+    {
+        "id": "3",
+        "title": "Holiday request",
+        "sender": "joe.doe@example.com",
+        "date": "10-07-2025 10:45:00",
+        "content": "I would like to take 5 days of holiday next week ? Is it possible ?"
+    },
+    {
+        "id": "4",
+        "title": "Invoice #1234",
+        "sender": "billing@example.com",
+        "date": "10-07-2025 10:52:00",
+        "content": "Your invoice #1234 is now available."
+    },
+    {
+        "id": "5",
+        "title": "Welcome to Our Newsletter!",
+        "sender": "newsletter@example.com",
+        "date": "10-07-2025 11:15:00",
+        "content": "Thank you for subscribing to our newsletter."
+    }
+]

@@ -1,0 +1,7 @@
+{
+    "id": "4",
+    "title": "Invoice #1234",
+    "sender": "billing@example.com",
+    "date": "10-07-2025 10:52:00",
+    "content": "Your invoice #1234 is now available."
+}

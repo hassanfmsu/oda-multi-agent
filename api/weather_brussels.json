@@ -1,0 +1,45 @@
+{
+    "visibility": 10000,
+    "timezone": 7200,
+    "main": {
+        "temp": 18.68,
+        "temp_min": 17.66,
+        "grnd_level": 1012,
+        "humidity": 63,
+        "pressure": 1019,
+        "sea_level": 1019,
+        "feels_like": 18.25,
+        "temp_max": 19.73
+    },
+    "clouds": {
+        "all": 0
+    },
+    "sys": {
+        "country": "BE",
+        "sunrise": 1750995053,
+        "sunset": 1751054415,
+        "id": 1227,
+        "type": 1
+    },
+    "dt": 1750975985,
+    "coord": {
+        "lon": 4.3488,
+        "lat": 50.8504
+    },
+    "weather": [
+        {
+            "icon": "01n",
+            "description": "clear sky",
+            "main": "Clear",
+            "id": 800
+        }
+    ],
+    "name": "Brussels",
+    "cod": 200,
+    "id": 2800866,
+    "base": "stations",
+    "wind": {
+        "deg": 250,
+        "speed": 6.17
+    }
+}

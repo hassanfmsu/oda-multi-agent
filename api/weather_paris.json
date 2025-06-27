@@ -1,0 +1,45 @@
+{
+    "visibility": 10000,
+    "timezone": 7200,
+    "main": {
+        "temp": 22.51,
+        "temp_min": 21.1,
+        "grnd_level": 1012,
+        "humidity": 77,
+        "pressure": 1021,
+        "sea_level": 1021,
+        "feels_like": 22.83,
+        "temp_max": 23.47
+    },
+    "clouds": {
+        "all": 100
+    },
+    "sys": {
+        "country": "FR",
+        "sunrise": 1750996139,
+        "sunset": 1751054289,
+        "id": 2012208,
+        "type": 2
+    },
+    "dt": 1750976125,
+    "coord": {
+        "lon": 2.3488,
+        "lat": 48.8534
+    },
+    "weather": [
+        {
+            "icon": "04n",
+            "description": "overcast clouds",
+            "main": "Clouds",
+            "id": 804
+        }
+    ],
+    "name": "Paris",
+    "cod": 200,
+    "id": 2988507,
+    "base": "stations",
+    "wind": {
+        "deg": 310,
+        "speed": 4.12
+    }
+}

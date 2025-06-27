@@ -1,0 +1,89 @@
+exportedRestServices:
+- endpoint: "https://agent-runtime.generativeai.eu-frankfurt-1.oci.oraclecloud.com/20240531/agentEndpoints/{agentEndpointId}/actions/chat"
+  name: "labAgentAsk"
+  type: "REST"
+  authType: "resourcePrincipal"
+  llmType: "CUSTOM"
+  mock: false
+  restServiceMethods:
+  - restServiceMethodType: "POST"
+    contentType: "application/json"
+    statusCode: 200
+    requestBody: "{\n    \"userMessage\": \"What is AI Agent?\",\n    \"shouldStream\": false,\n    \"sessionId\": \"ocid1.genaiagentsession.oc1.eu-frankfurt-1.xxxxxx\"\n}"
+    mockResponsePayload: "{}"
+    restServiceParams:
+    - type: "path"
+      key: "agentEndpointId"
+      value: "ocid1.genaiagentendpoint.oc1.eu-frankfurt-1.xxxxxxxx"
+- endpoint: "https://agent-runtime.generativeai.eu-frankfurt-1.oci.oraclecloud.com/20240531/agentEndpoints/{agentEndpointId}/sessions"
+  name: "labAgentConnect"
+  type: "REST"
+  authType: "resourcePrincipal"
+  llmType: "CUSTOM"
+  mock: false
+  restServiceMethods:
+  - restServiceMethodType: "POST"
+    contentType: "application/json"
+    statusCode: 200
+    requestBody: "{\n    \"idleTimeoutInSeconds\": 3600\n}"
+    mockResponsePayload: "{}"
+    restServiceParams:
+    - type: "path"
+      key: "agentEndpointId"
+      value: "ocid1.genaiagentendpoint.oc1.eu-frankfurt-1.xxxxxxxx"
+- endpoint: "https://objectstorage.eu-frankfurt-1.oraclecloud.com/n/xxxxxx/b/bucket-api/o/email.json"
+  name: "toolEmailAll"
+  type: "REST"
+  authType: "noAuth"
+  mock: false
+  restServiceMethods:
+  - restServiceMethodType: "GET"
+    contentType: "application/json"
+    statusCode: 200
+    restServiceParams: []
+- endpoint: "https://objectstorage.eu-frankfurt-1.oraclecloud.com/n/xxxxxx/b/bucket-api/o/email_{email_id}.json"
+  name: "toolEmailOne"
+  type: "REST"
+  authType: "noAuth"
+  mock: false
+  restServiceMethods:
+  - restServiceMethodType: "GET"
+    contentType: "application/json"
+    restServiceParams:
+    - type: "path"
+      key: "email_id"
+      value: "1"
+- endpoint: "https://objectstorage.eu-frankfurt-1.oraclecloud.com/n/xxxxxx/b/bucket-api/o/hr_policy_joe_doe.txt"
+  name: "toolHrPolicy"
+  type: "REST"
+  authType: "noAuth"
+  mock: false
+  restServiceMethods:
+  - restServiceMethodType: "GET"
+    contentType: "application/json"
+    restServiceParams: []
+- endpoint: "https://objectstorage.eu-frankfurt-1.oraclecloud.com/n/xxxxxx/b/bucket-api/o/weather_{city}.json"
+  name: "toolWeather"
+  type: "REST"
+  authType: "noAuth"
+  llmType: "CUSTOM"
+  mock: false
+  restServiceMethods:
+  - restServiceMethodType: "GET"
+    contentType: "application/json"
+    restServiceParams:
+    - type: "query"
+      key: "city"
+      value: "brussels"
+- endpoint: "https://en.wikipedia.org/w/index.php?action=raw&title={title}"
+  name: "toolWiki"
+  type: "REST"
+  authType: "noAuth"
+  mock: false
+  restServiceMethods:
+  - restServiceMethodType: "GET"
+    contentType: "application/json"
+    restServiceParams:
+    - type: "path"
+      key: "title"
+      value: "espionage"
