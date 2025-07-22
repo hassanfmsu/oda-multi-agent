@@ -72,7 +72,7 @@ exportedRestServices:
   - restServiceMethodType: "GET"
     contentType: "application/json"
     restServiceParams:
-    - type: "query"
+    - type: "path"
       key: "city"
       value: "brussels"
 - endpoint: "https://en.wikipedia.org/w/index.php?action=raw&title={title}"
