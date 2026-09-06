@@ -1,0 +1,503 @@
+name: "ragAgent"
+trackingId: "AAAA000D-0000-0000-0000-00000000000D"
+type: "task"
+version: "2.0"
+interface: {}
+configuration:
+  requiresAuthorization: false
+  defaultApplicationContext: false
+  privateThread: false
+variables:
+- name: "ragRetried"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+defaultTransitions:
+  actions:
+    system.startTaskFlow: "initRagRetry"
+states:
+  initRagRetry:
+    component: "System.SetVariable"
+    properties:
+      variable: "ragRetried"
+      value: "N"
+    transitions:
+      next: "checkSession"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: false
+        requiresAuthorization: false
+  checkRagRetry:
+    component: "System.Switch"
+    properties:
+      source: "${((ragRetried!'N') == 'Y')?then('GIVEUP','RETRY')}"
+    transitions:
+      actions:
+        RETRY: "resetRagSession"
+        GIVEUP: "returnRagError"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        source: true
+        requiresAuthorization: false
+  resetRagSession:
+    component: "System.SetVariable"
+    properties:
+      variable: "ragRetried"
+      value: "Y"
+    transitions:
+      next: "clearRagSession"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: false
+        requiresAuthorization: false
+  clearRagSession:
+    component: "System.ResetVariables"
+    properties:
+      variableList: "skill.sessionID"
+    transitions:
+      next: "createSession"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variableList: false
+        requiresAuthorization: false
+  checkSession:
+    component: "System.Switch"
+    properties:
+      source: "${(skill.sessionID.value?has_content)?then('true','false')}"
+    transitions:
+      actions:
+        "true": "callRagAgent"
+        "false": "createSession"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        source: true
+        requiresAuthorization: false
+  createSession:
+    component: "System.CallRestService"
+    properties:
+      authConfigType: "resourcePrincipal"
+      restService: "labAgentConnect"
+      endpoint: "https://agent-runtime.generativeai.eu-frankfurt-1.oci.oraclecloud.com/20240531/agentEndpoints/{agentEndpointId}/sessions"
+      responseConfig: "apiResponse"
+      requestHeaders: []
+      method: "POST"
+      requestBody: "{\n    \"idleTimeoutInSeconds\": 3600\n}"
+      requestParameters:
+      - type: "path"
+        value: "${(skill.system.config.agentEndpointId)!''}"
+        key: "agentEndpointId"
+      resultVariable: "skill.sessionID"
+    transitions:
+      actions:
+        error: "returnSessionError"
+      next: "callRagAgent"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        authConfigType: false
+        requestParameters--Item--type: false
+        restService: false
+        endpoint: false
+        responseConfig: false
+        method: false
+        requestBody: false
+        apiKeyValueVariable: false
+        passwordVariable: false
+        tokenVariable: false
+        resultVariable: false
+        requiresAuthorization: false
+  callRagAgent:
+    component: "System.CallRestService"
+    properties:
+      authConfigType: "resourcePrincipal"
+      restService: "labAgentAsk"
+      endpoint: "https://agent-runtime.generativeai.eu-frankfurt-1.oci.oraclecloud.com/20240531/agentEndpoints/{agentEndpointId}/actions/chat"
+      responseConfig: "apiResponse"
+      requestHeaders: []
+      method: "POST"
+      requestBody: "{\n    \"userMessage\": \"${((skill.userQuestion)!'')?trim?json_string}\",\n    \"shouldStream\": false,\n    \"sessionId\": \"${(skill.sessionID.value.responsePayload.id)!''}\"\n}"
+      requestParameters:
+      - type: "path"
+        value: "${(skill.system.config.agentEndpointId)!''}"
+        key: "agentEndpointId"
+      resultVariable: "skill.restResp"
+    transitions:
+      actions:
+        error: "checkRagRetry"
+      next: "checkAnswered"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        authConfigType: false
+        requestParameters--Item--type: false
+        restService: false
+        endpoint: false
+        responseConfig: false
+        method: false
+        requestBody: false
+        apiKeyValueVariable: false
+        passwordVariable: false
+        tokenVariable: false
+        resultVariable: false
+        requiresAuthorization: false
+  checkAnswered:
+    component: "System.Switch"
+    properties:
+      source: "${((skill.restResp.value.statusCode!0)?number == 200)?then('OK','BAD')}"
+    transitions:
+      actions:
+        OK: "checkHasContent"
+        BAD: "checkRagRetry"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        source: true
+        requiresAuthorization: false
+  checkHasContent:
+    component: "System.Switch"
+    properties:
+      source: "${(((skill.restResp.value.responsePayload.message.content.text)!'')?length > 0)?then('found','notfound')}"
+    transitions:
+      actions:
+        found: "returnAnswered"
+        notfound: "returnNotFound"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        source: true
+        requiresAuthorization: false
+  returnAnswered:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.finalAnswer"
+      value: "${(skill.restResp.value.responsePayload.message.content.text)!''}"
+    transitions:
+      next: "renderRagAnswer"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  renderRagAnswer:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        langName: "${(skill.userLangName)!'English'}"
+        textEn: "${(skill.finalAnswer)!''}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0
+      maxTokens: 1500
+      resultVariable: "skill.finalAnswer"
+      standardActions: ""
+      promptTemplate: "Write the POLICY ANSWER below in ${langName}.\n\nLANGUAGE — ALREADY DECIDED BY THE SYSTEM, DO NOT DETECT IT:\n- If ${langName} is English, output the ANSWER unchanged, character for character.\n- Otherwise translate it completely and naturally into ${langName}, leaving no English words behind. Use natural HR wording an employee would recognise, not a literal word-for-word rendering.\n- Never mix languages.\n\nFAITHFULNESS — THIS IS AN HR POLICY ANSWER, ACCURACY MATTERS MORE THAN STYLE:\n- Do NOT add, remove, soften, summarise or invent ANY fact, rule, condition or exception.\n- Keep every number, hour, day count, percentage, amount, date and proper name EXACTLY as it appears.\n- Keep the structure: same paragraphs, same bullets, same line breaks, same ordering.\n- Do not add an introduction, a closing line, or any commentary of your own.\n\nOutput ONLY the resulting text. No quotes, no labels, no explanation.\n\nANSWER\n${textEn}\n\nOUTPUT"
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment please... لحظة من فضلك"
+    transitions:
+      actions:
+        error: "outputRagDirect"
+      next: "outputRagDirect"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  outputRagDirect:
+    component: "System.CommonResponse"
+    properties:
+      metadata:
+        responseItems:
+        - text: "${skill.finalAnswer}"
+          type: "text"
+      keepTurn: true
+    transitions:
+      next: "appendRagHistory"
+    metadata:
+      virtualComponent: "Virtual.Output"
+      propertySheetIsFreeMarkerMap:
+        requiresAuthorization: false
+  appendRagHistory:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.questionAnswerHistory"
+      value: "${(skill.questionAnswerHistory)!''}\n\n### Question\n${(skill.userQuestion)!''}\n### Answer\n${skill.finalAnswer}"
+    transitions: {}
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  returnNotFound:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.renderedMsg"
+      value: "I don't have information on that specific policy yet. Currently available policies are: Working Hours, Performance Management, Air Ticket Entitlement, Dress Code Guideline, and Remote Working Policy. More will be added soon."
+    transitions:
+      next: "returnNotFoundRender"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  returnNotFoundRender:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        langName: "${(skill.userLangName)!'English'}"
+        textEn: "${(skill.renderedMsg)!''}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0
+      maxTokens: 400
+      resultVariable: "skill.renderedMsg"
+      standardActions: ""
+      promptTemplate: "Write the TEXT below in ${langName}.\n\nLANGUAGE — ALREADY DECIDED BY THE SYSTEM, DO NOT DETECT IT:\n- If ${langName} is English, output the TEXT unchanged, character for character.\n- Otherwise translate it completely and naturally into ${langName}, leaving no English words behind.\n- Never mix languages.\n- Keep every emoji, bullet, line break, number, date, currency and proper name exactly as it is and exactly where it is.\n- Do NOT add, remove, soften or invent any information.\n\nOutput ONLY the resulting text. No quotes, no labels, no explanation.\n\nTEXT\n${textEn}\n\nOUTPUT"
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment please... لحظة من فضلك"
+    transitions:
+      actions:
+        error: "returnNotFoundOut"
+      next: "returnNotFoundOut"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  returnNotFoundOut:
+    component: "System.CommonResponse"
+    properties:
+      metadata:
+        responseItems:
+        - text: "${skill.renderedMsg}"
+          type: "text"
+      keepTurn: true
+    transitions: {}
+    metadata:
+      virtualComponent: "Virtual.Output"
+      propertySheetIsFreeMarkerMap:
+        requiresAuthorization: false
+  returnSessionError:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.renderedMsg"
+      value: "The policy lookup service is temporarily unavailable. Please try again later."
+    transitions:
+      next: "returnSessionErrorRender"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  returnSessionErrorRender:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        langName: "${(skill.userLangName)!'English'}"
+        textEn: "${(skill.renderedMsg)!''}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0
+      maxTokens: 400
+      resultVariable: "skill.renderedMsg"
+      standardActions: ""
+      promptTemplate: "Write the TEXT below in ${langName}.\n\nLANGUAGE — ALREADY DECIDED BY THE SYSTEM, DO NOT DETECT IT:\n- If ${langName} is English, output the TEXT unchanged, character for character.\n- Otherwise translate it completely and naturally into ${langName}, leaving no English words behind.\n- Never mix languages.\n- Keep every emoji, bullet, line break, number, date, currency and proper name exactly as it is and exactly where it is.\n- Do NOT add, remove, soften or invent any information.\n\nOutput ONLY the resulting text. No quotes, no labels, no explanation.\n\nTEXT\n${textEn}\n\nOUTPUT"
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment please... لحظة من فضلك"
+    transitions:
+      actions:
+        error: "returnSessionErrorOut"
+      next: "returnSessionErrorOut"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  returnSessionErrorOut:
+    component: "System.CommonResponse"
+    properties:
+      metadata:
+        responseItems:
+        - text: "${skill.renderedMsg}"
+          type: "text"
+      keepTurn: true
+    transitions: {}
+    metadata:
+      virtualComponent: "Virtual.Output"
+      propertySheetIsFreeMarkerMap:
+        requiresAuthorization: false
+  returnRagError:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.renderedMsg"
+      value: "The policy lookup service is temporarily unavailable. Please try again later or contact HR."
+    transitions:
+      next: "returnRagErrorRender"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  returnRagErrorRender:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        langName: "${(skill.userLangName)!'English'}"
+        textEn: "${(skill.renderedMsg)!''}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0
+      maxTokens: 400
+      resultVariable: "skill.renderedMsg"
+      standardActions: ""
+      promptTemplate: "Write the TEXT below in ${langName}.\n\nLANGUAGE — ALREADY DECIDED BY THE SYSTEM, DO NOT DETECT IT:\n- If ${langName} is English, output the TEXT unchanged, character for character.\n- Otherwise translate it completely and naturally into ${langName}, leaving no English words behind.\n- Never mix languages.\n- Keep every emoji, bullet, line break, number, date, currency and proper name exactly as it is and exactly where it is.\n- Do NOT add, remove, soften or invent any information.\n\nOutput ONLY the resulting text. No quotes, no labels, no explanation.\n\nTEXT\n${textEn}\n\nOUTPUT"
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment please... لحظة من فضلك"
+    transitions:
+      actions:
+        error: "returnRagErrorOut"
+      next: "returnRagErrorOut"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  returnRagErrorOut:
+    component: "System.CommonResponse"
+    properties:
+      metadata:
+        responseItems:
+        - text: "${skill.renderedMsg}"
+          type: "text"
+      keepTurn: true
+    transitions: {}
+    metadata:
+      virtualComponent: "Virtual.Output"
+      propertySheetIsFreeMarkerMap:
+        requiresAuthorization: false

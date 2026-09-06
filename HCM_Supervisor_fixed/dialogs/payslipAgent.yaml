@@ -1,0 +1,627 @@
+name: "payslipAgent"
+trackingId: "AAAA0010-0000-0000-0000-000000000010"
+type: "task"
+version: "2.0"
+interface: {}
+configuration:
+  requiresAuthorization: false
+  defaultApplicationContext: false
+  privateThread: false
+variables:
+- name: "langCode"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "askMsg"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "monthLLMResponse"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "periodEndDate"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "payslipStatus"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "now"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+defaultTransitions:
+  actions:
+    system.startTaskFlow: "resetVariables"
+states:
+  resetVariables:
+    component: "System.ResetVariables"
+    properties:
+      variableList: "langCode,askMsg,monthLLMResponse,periodEndDate,payslipStatus,now"
+    transitions:
+      next: "setnow"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variableList: false
+        requiresAuthorization: false
+  setnow:
+    component: "System.SetVariable"
+    properties:
+      variable: "now"
+      value: "${.now?string('yyyy-MM-dd')}"
+    transitions:
+      next: "detectLang"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  detectLang:
+    component: "System.SetVariable"
+    properties:
+      variable: "langCode"
+      value: "${(skill.userLang)!'en'}"
+    transitions:
+      next: "normalizeLang"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  normalizeLang:
+    component: "System.SetVariable"
+    properties:
+      variable: "langCode"
+      value: "${((((langCode!'')?trim?lower_case)?length) gt 1)?then(((langCode!'')?trim?lower_case)?substring(0,2),'en')}"
+    transitions:
+      next: "invokeMonthLLM"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  renderMonthQuestion:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        targetLang: "${(langCode)!'en'}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0
+      maxTokens: 128
+      resultVariable: "askMsg"
+      standardActions: ""
+      promptTemplate: "Write the TEXT below in the language identified by the two-letter ISO 639-1 code given under TARGET LANGUAGE.\n\nRules:\n- If TARGET LANGUAGE is en, output the TEXT completely unchanged.\n- Otherwise translate it naturally into that language.\n- Output ONLY the resulting sentence. No quotes, no labels, no explanation, no extra sentences.\n\nTARGET LANGUAGE\n${targetLang}\n\nTEXT\nWhich month would you like the payslip for? You can say a month name such as November, or say last month.\n\nOUTPUT"
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment please... لحظة من فضلك"
+    transitions:
+      actions:
+        error: "fallbackMonthQuestion"
+      next: "question"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  fallbackMonthQuestion:
+    component: "System.SetVariable"
+    properties:
+      variable: "askMsg"
+      value: "For which month would you like the payslip? — لأي شهر تريد مسير الراتب؟"
+    transitions:
+      next: "question"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  invokeMonthLLM:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: true
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: true
+      promptTemplateParameters:
+        question: "${((skill.question)!'')?replace('<not set>','')}"
+        periodEndDate: "${((periodEndDate)!'')?replace('<not set>','')}"
+        now: "${now}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0
+      maxTokens: 256
+      resultVariable: "monthLLMResponse"
+      standardActions: ""
+      promptTemplate: "Work out WHICH MONTH's payslip the employee wants, and output the LAST DAY of that month as periodEndDate in YYYY-MM-DD format.\n\nYou never write a message to the employee. You only output JSON. Another component asks the questions.\n\n============================\nTODAY\n============================\n${now}\n\n============================\nMONTH ALREADY COLLECTED\n============================\n${periodEndDate}\n\n============================\nEMPLOYEE JUST SAID\n============================\n${question}\n\n============================\nRULES\n============================\n- ALWAYS interpret a misspelled word as the word the employee most likely intended. Examples of misspellings you MUST accept: juky, jully, julyy, jjuly all mean July. janury, janaury mean January. febuary, feburary mean February. mrach mean March. aprl mean April. jne, jjune mean June. agust, augst, augest mean August. septmber, setember, sepetmber mean September. ocotber, octber mean October. novmber, noveber mean November. decmber, decemebr mean December. Short forms such as jan, feb, mar, apr, jun, jul, aug, sep, sept, oct, nov, dec are valid month names.\n- Payslips exist only for FINISHED months. If the employee names a month WITHOUT a year: if that month in the CURRENT year has already ended relative to TODAY, use the current year; otherwise use the PREVIOUS year.\n- last month means the previous calendar month. this month means the current calendar month. Accept the same meanings in any language, for example الشهر الماضي and هذا الشهر.\n- Accept English month names, Arabic month names such as يناير فبراير مارس ابريل مايو يونيو يوليو اغسطس سبتمبر اكتوبر نوفمبر ديسمبر, and numeric forms such as 11/2025, 2025-11, and شهر 11.\n- periodEndDate MUST be the LAST day of the month: Jan 31, Feb 28 or 29 in leap years such as 2024 and 2028, Mar 31, Apr 30, May 31, Jun 30, Jul 31, Aug 31, Sep 30, Oct 31, Nov 30, Dec 31.\n- If a year IS given, use it as-is, UNLESS that month has not ended yet relative to TODAY. In that case output status incomplete.\n- Keep the month already collected unless the employee changes it.\n\n============================\nSTATUS VALUES\n============================\ncomplete  — the month is determined. Output {\"status\":\"complete\",\"periodEndDate\":\"YYYY-MM-DD\"}\nincomplete — no month yet, or the named month has not finished. Output {\"status\":\"incomplete\",\"periodEndDate\":\"\"}\ncancel — the employee wants to stop or abandon the request. This includes cancel, stop, quit, never mind, forget it, misspellings such as cancle, canacel, cansel, and Arabic forms such as الغاء, إلغاء, خلاص, لا اريد. Output {\"status\":\"cancel\",\"periodEndDate\":\"\"}\nofftopic — the latest input is a DIFFERENT request entirely, not a month and not about this payslip: a greeting alone, leave balance, absence history, submitting a leave, attendance, a policy question. Output {\"status\":\"offtopic\",\"periodEndDate\":\"\"}\nA message that repeats the payslip request but still names no month is incomplete, NOT offtopic.\n\n============================\nEXAMPLES — assume TODAY is 2026-07-15\n============================\ni want my payslip for november   -> {\"status\":\"complete\",\"periodEndDate\":\"2025-11-30\"}\npayslip for june                 -> {\"status\":\"complete\",\"periodEndDate\":\"2026-06-30\"}\njuky                             -> {\"status\":\"complete\",\"periodEndDate\":\"2026-06-30\"}\nseptmber                         -> {\"status\":\"complete\",\"periodEndDate\":\"2025-09-30\"}\npayslip feb 2024                 -> {\"status\":\"complete\",\"periodEndDate\":\"2024-02-29\"}\nmy payslip for last month        -> {\"status\":\"complete\",\"periodEndDate\":\"2026-06-30\"}\ni want my payslip                -> {\"status\":\"incomplete\",\"periodEndDate\":\"\"}\ncanacel                          -> {\"status\":\"cancel\",\"periodEndDate\":\"\"}\nhello                            -> {\"status\":\"offtopic\",\"periodEndDate\":\"\"}\nNote on the juky example: July 2026 has not finished on 2026-07-15, so the previous July that has finished is used. Apply the same reasoning to the real TODAY above.\n\n============================\nOUTPUT FORMAT\n============================\n- Respond with JSON ONLY. No text before or after. No message field.\n- ALWAYS output both fields: status and periodEndDate, using an empty string when unknown.\n- status is exactly one of: complete, incomplete, cancel, offtopic."
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment, please..."
+    transitions:
+      actions:
+        error: "monthLLMFallback"
+      next: "cleanMonthJson"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        outOfScopeKeyword: false
+        enableStreaming: false
+        userPrompt: true
+        outOfScopeMessage: true
+        enableMultiTurn: false
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        promptTemplate: true
+        eventHandler: false
+        retryUserMessage: true
+        llmService: false
+  monthLLMFallback:
+    component: "System.SetVariable"
+    properties:
+      variable: "monthLLMResponse"
+      value: "{\"status\":\"incomplete\",\"periodEndDate\":\"\"}"
+    transitions:
+      next: "cleanMonthJson"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: false
+        requiresAuthorization: false
+  cleanMonthJson:
+    component: "System.SetVariable"
+    properties:
+      variable: "monthLLMResponse"
+      value: "${\"{\" + ((monthLLMResponse!'{}')?keep_after(\"{\"))?keep_before_last(\"}\") + \"}\"}"
+    transitions:
+      next: "checkJsonShape"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  checkJsonShape:
+    component: "System.Switch"
+    properties:
+      source: "${((monthLLMResponse!'')?contains('periodEndDate'))?then('JSON','BAD')}"
+    transitions:
+      actions:
+        JSON: "setPeriodEndDate"
+        BAD: "clearQuestion"
+      next: "clearQuestion"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        source: true
+        requiresAuthorization: false
+  setPeriodEndDate:
+    component: "System.SetVariable"
+    properties:
+      variable: "periodEndDate"
+      value: "${((monthLLMResponse?eval_json.periodEndDate)!(periodEndDate!''))?replace('<not set>','')}"
+    transitions:
+      next: "setPayslipStatus"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  setPayslipStatus:
+    component: "System.SetVariable"
+    properties:
+      variable: "payslipStatus"
+      value: "${(monthLLMResponse?eval_json.status)!'incomplete'}"
+    transitions:
+      next: "switchMonthStatus"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  switchMonthStatus:
+    component: "System.Switch"
+    properties:
+      variable: "payslipStatus"
+    transitions:
+      actions:
+        incomplete: "clearQuestion"
+        complete: "callPayslipAPI"
+        cancel: "presentCancelled"
+        offtopic: "rerouteToLoop"
+      next: "clearQuestion"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        source: true
+        requiresAuthorization: false
+  presentCancelled:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        targetLang: "${(langCode)!'en'}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0.2
+      maxTokens: 128
+      resultVariable: "skill.finalAnswer"
+      standardActions: ""
+      promptTemplate: "Write ONE short, polite message confirming that the payslip request has been cancelled and that you are happy to help with anything else.\n\nWrite it in the language identified by the two-letter ISO 639-1 code given under TARGET LANGUAGE. If TARGET LANGUAGE is en, write it in English.\n\nTARGET LANGUAGE\n${targetLang}\n\nOutput ONLY the message text, no quotes, no labels."
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment please... لحظة من فضلك"
+    transitions:
+      actions:
+        error: "presenterFallback"
+      next: "outputDirect"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  rerouteToLoop:
+    component: "System.InvokeFlow"
+    properties:
+      inputParameters:
+      - name: "lastTool"
+        value: "init"
+      - name: "lastToolResult"
+        value: "none"
+      flow: "loopFlow"
+      outputParameters: []
+    transitions: {}
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        flow: false
+  clearQuestion:
+    component: "System.ResetVariables"
+    properties:
+      variableList: "skill.question,askMsg"
+    transitions:
+      next: "renderMonthQuestion"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variableList: false
+        requiresAuthorization: false
+  question:
+    component: "System.CommonResponse"
+    properties:
+      variable: "skill.question"
+      processUserMessage: true
+      prompt: "${(askMsg)!((((skill.userLang)!'en') == 'ar')?then('لأي شهر تريد مسير الراتب؟','For which month would you like the payslip?'))}"
+    transitions:
+      next: "invokeMonthLLM"
+    metadata:
+      virtualComponent: "Virtual.Question"
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        prompt: true
+        requiresAuthorization: false
+  callPayslipAPI:
+    component: "System.CallRestService"
+    properties:
+      authConfigType: "basicAuth"
+      restService: "GetPayslip"
+      endpoint: "https://aljent-oic-jed-prod01-lrwl7ouc1vb3-je.integration.me-jeddah-1.ocp.oraclecloud.com/ic/api/integration/v1/flows/rest/EMP_PAYSLIP_VIEW_INT/1.0/getEmpPayslip"
+      responseConfig: "apiResponse"
+      requestHeaders: []
+      method: "POST"
+      requestBody: "{\n    \"personID\": \"${(profile.properties.value.personId)!''}\",\n    \"email\": \"${(profile.email)!''}\",\n    \"periodEndDate\": \"${periodEndDate}\"\n}"
+      requestParameters: []
+      resultVariable: "skill.restResp"
+    transitions:
+      actions:
+        error: "presentServiceError"
+      next: "checkAnswered"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        authConfigType: false
+        restService: false
+        endpoint: false
+        responseConfig: false
+        method: false
+        requestBody: true
+        apiKeyValueVariable: false
+        passwordVariable: false
+        tokenVariable: false
+        resultVariable: false
+        requiresAuthorization: false
+  checkAnswered:
+    component: "System.Switch"
+    properties:
+      source: "${((skill.restResp.value.statusCode!0)?number == 200)?then('OK','BAD')}"
+    transitions:
+      actions:
+        OK: "presentPayslip"
+        BAD: "presentNoData"
+      next: "presentNoData"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        source: true
+        requiresAuthorization: false
+  presentPayslip:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: true
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        targetLang: "${(langCode)!'en'}"
+        month: "${(periodEndDate)!''}"
+        payslipJson: "${(skill.restResp?string)!''}"
+        workEmail: "${(profile.email)!''}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0.2
+      maxTokens: 512
+      resultVariable: "skill.finalAnswer"
+      standardActions: ""
+      promptTemplate: "You are Ameen, an HR assistant. Tell the employee the TOTALS of their payslip, using ONLY the data in the JSON below.\n\nLANGUAGE RULE — obey before writing anything:\nWrite your whole message in the language identified by the two-letter ISO 639-1 code given under TARGET LANGUAGE. If TARGET LANGUAGE is en, write in English. Never mix languages.\n\nTARGET LANGUAGE\n${targetLang}\n\nPAYSLIP PERIOD END DATE\n${month}\n\nEMPLOYEE WORK EMAIL\n${workEmail}\n\nRAW PAYROLL SERVICE RESPONSE (JSON)\n${payslipJson}\n\nWHAT TO WRITE\n- Line 1: a short heading naming the payslip month, for example: 💰 Payslip · July 2026. Derive the month name from the PAYSLIP PERIOD END DATE above and write it in the target language.\n- Then the TOTALS only, one per line, using ONLY values that actually exist in the JSON. Typically: total earnings or gross pay, total deductions, and net pay. Label each one clearly and keep every number and currency EXACTLY as it appears in the JSON.\n- Put the NET PAY last and make it the clear final figure.\n- Do NOT list individual earning or deduction items. Totals only. This is a summary, not the full payslip.\n- Last line: tell the employee that the full payslip document has been sent to their work email, and state the email address shown above. Keep it to one short sentence.\n\nHARD RULES\n- Never calculate, sum, round or invent any number. If a total is not present in the JSON, simply omit that line.\n- Never output a URL or a link of any kind.\n- Never mention a download button, an attachment in the chat, or technical field names.\n- If the JSON contains NO payslip data at all (empty payload, an error, or no pay figures), politely say you could not find a payslip for that month, suggest trying another month, and do NOT claim anything was emailed.\n- Output ONLY the message text — no JSON, no code fences, no labels, no quotes, no markdown asterisks."
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment please... لحظة من فضلك"
+    transitions:
+      actions:
+        error: "presenterFallback"
+      next: "outputDirect"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  presentNoData:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        targetLang: "${(langCode)!'en'}"
+        month: "${(periodEndDate)!''}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0.2
+      maxTokens: 160
+      resultVariable: "skill.finalAnswer"
+      standardActions: ""
+      promptTemplate: "Write ONE short, polite message telling the employee that no payslip was found for the month ending ${month}, and suggesting they try another month, for example the previous month.\n\nWrite it in the language identified by the two-letter ISO 639-1 code given under TARGET LANGUAGE. If TARGET LANGUAGE is en, write it in English.\n\nTARGET LANGUAGE\n${targetLang}\n\nOutput ONLY the message text, no quotes, no labels."
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment please... لحظة من فضلك"
+    transitions:
+      actions:
+        error: "presenterFallback"
+      next: "outputDirect"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  presenterFallback:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.finalAnswer"
+      value: "I could not retrieve your payslip right now. Please try again in a moment.\n\nلم أتمكن من جلب مسير الراتب حالياً. يرجى المحاولة مرة أخرى بعد قليل."
+    transitions:
+      next: "outputDirect"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  outputDirect:
+    component: "System.CommonResponse"
+    properties:
+      metadata:
+        responseItems:
+        - text: "${skill.finalAnswer}"
+          type: "text"
+      keepTurn: true
+    transitions:
+      next: "appendHistory"
+    metadata:
+      virtualComponent: "Virtual.Output"
+      propertySheetIsFreeMarkerMap:
+        requiresAuthorization: false
+  appendHistory:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.questionAnswerHistory"
+      value: "${(skill.questionAnswerHistory)!''}\n\n### Question\n${(skill.userQuestion)!''}\n### Answer\n${skill.finalAnswer}"
+    transitions: {}
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  presentServiceError:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        targetLang: "${(langCode)!'en'}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0.2
+      maxTokens: 128
+      resultVariable: "skill.finalAnswer"
+      standardActions: ""
+      promptTemplate: "Write ONE short, polite message telling the employee that the payslip service is temporarily unavailable and to please try again in a little while.\n\nWrite it in the language identified by the two-letter ISO 639-1 code given under TARGET LANGUAGE. If TARGET LANGUAGE is en, write it in English.\n\nTARGET LANGUAGE\n${targetLang}\n\nOutput ONLY the message text, no quotes, no labels."
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment please... لحظة من فضلك"
+    transitions:
+      actions:
+        error: "presenterFallback"
+      next: "outputDirect"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false

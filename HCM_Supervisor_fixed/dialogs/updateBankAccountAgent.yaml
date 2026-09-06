@@ -1,0 +1,1022 @@
+name: "updateBankAccountAgent"
+trackingId: "12ed8dc8-e20a-4654-8072-d1900b4b05ac"
+type: "task"
+version: "2.0"
+interface: {}
+configuration:
+  requiresAuthorization: false
+  defaultApplicationContext: false
+  privateThread: false
+variables:
+- name: "bankName"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "accountNumber"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "iban"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "bankAttachment"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "bankAttFileName"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "bankAttRetry"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "bankLLMResponse"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "bankStatus"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "bankSubmitResult"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "BankAPIResponse"
+  type: "map"
+  metadata:
+    isFreeMarker: false
+  system: false
+- name: "errorReason"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "now"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "confirmReply"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "confirmResult"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+defaultTransitions:
+  actions:
+    system.startTaskFlow: "resetVariables"
+states:
+  setIban:
+    component: "System.SetVariable"
+    properties:
+      variable: "iban"
+      value: "${((bankLLMResponse?eval_json.iban)!(iban!''))?replace('<not set>','')}"
+    transitions:
+      next: "setBankStatus"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  callBankAPI:
+    component: "System.CallRestService"
+    properties:
+      authConfigType: "basicAuth"
+      restService: "BankAccountUpdate"
+      endpoint: "https://aljent-oic-jed-prod01-lrwl7ouc1vb3-je.integration.me-jeddah-1.ocp.oraclecloud.com/ic/api/integration/v1/flows/rest/BANK_ACCOUN_DETAIL_SUBMIT_INT/1.0/DORSubmit/BankAccountDetails"
+      responseConfig: "apiResponse"
+      requestHeaders: []
+      method: "POST"
+      requestBody: "{\n    \"personID\": \"${(profile.properties.value.personId)!''}\",\n  \"email\": \"${(profile.email)!''}\",\n    \"documentRecordsDFF\": [\n        {\n            \"bankName\": \"${((bankName)!'')?json_string}\",\n            \"iban\": \"${((iban)!'')?json_string}\",\n            \"accountNumber\": \"${((accountNumber)!'')?json_string}\",\n            \"bankBranch\": \"\"\n        }\n    ],\n    \"attachments\": [\n        {\n            \"FileName\": \"${((bankAttFileName)!'Bank_Attachment')?json_string}\",\n            \"AttachmentURL\": \"${((bankAttachment)!'')?json_string}\"\n        }\n    ]\n}"
+      requestParameters: []
+      resultVariable: "BankAPIResponse"
+    transitions:
+      actions:
+        error: "extractErrorReason"
+      next: "setBankSubmitResult"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        authConfigType: false
+        restService: false
+        endpoint: false
+        responseConfig: false
+        method: false
+        requestBody: true
+        apiKeyValueVariable: false
+        passwordVariable: false
+        tokenVariable: false
+        resultVariable: false
+        requiresAuthorization: false
+  attachmentFailed:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.renderedMsg"
+      value: "⚠️ I couldn't read the attachment, and it is required to update your bank account. Please try again later or contact HR."
+    transitions:
+      next: "attachmentFailedRender"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  attachmentFailedRender:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        langName: "${(skill.userLangName)!'English'}"
+        textEn: "${(skill.renderedMsg)!''}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0
+      maxTokens: 400
+      resultVariable: "skill.renderedMsg"
+      standardActions: ""
+      promptTemplate: "Write the TEXT below in ${langName}.\n\nLANGUAGE — ALREADY DECIDED BY THE SYSTEM, DO NOT DETECT IT:\n- If ${langName} is English, output the TEXT unchanged, character for character.\n- Otherwise translate it completely and naturally into ${langName}, leaving no English words behind.\n- Never mix languages.\n- Keep every emoji, bullet, line break, number, date, currency and proper name exactly as it is and exactly where it is.\n- Do NOT add, remove, soften or invent any information.\n\nOutput ONLY the resulting text. No quotes, no labels, no explanation.\n\nTEXT\n${textEn}\n\nOUTPUT"
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment please... لحظة من فضلك"
+    transitions:
+      actions:
+        error: "attachmentFailedOut"
+      next: "attachmentFailedOut"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  attachmentFailedOut:
+    component: "System.CommonResponse"
+    properties:
+      metadata:
+        responseItems:
+        - text: "${skill.renderedMsg}"
+          type: "text"
+      keepTurn: true
+    transitions:
+      next: "appendTxnHistory"
+    metadata:
+      virtualComponent: "Virtual.Output"
+      propertySheetIsFreeMarkerMap:
+        requiresAuthorization: false
+  confirmSummaryPrep:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.renderedMsg"
+      value: "Please confirm your bank account update:\n🏦 Bank: ${bankName}\n#️⃣ Account: ${accountNumber}\nIBAN: ${iban}\n📎 Attachment: ${bankAttFileName}\nShall I submit it?"
+    transitions:
+      next: "confirmSummaryRender"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  confirmSummaryRender:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        langName: "${(skill.userLangName)!'English'}"
+        textEn: "${(skill.renderedMsg)!''}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0
+      maxTokens: 400
+      resultVariable: "skill.renderedMsg"
+      standardActions: ""
+      promptTemplate: "Write the TEXT below in ${langName}.\n\nLANGUAGE — ALREADY DECIDED BY THE SYSTEM, DO NOT DETECT IT:\n- If ${langName} is English, output the TEXT unchanged, character for character.\n- Otherwise translate it completely and naturally into ${langName}, leaving no English words behind.\n- Never mix languages.\n- Keep every emoji, bullet, line break, number, date, currency, IBAN, account number and proper name exactly as it is and exactly where it is.\n- Do NOT add, remove, soften or invent any information.\n\nOutput ONLY the resulting text. No quotes, no labels, no explanation.\n\nTEXT\n${textEn}\n\nOUTPUT"
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment please... لحظة من فضلك"
+    transitions:
+      actions:
+        error: "confirmSummary"
+      next: "confirmSummary"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  confirmSummary:
+    component: "System.CommonResponse"
+    properties:
+      variable: "confirmReply"
+      processUserMessage: true
+      prompt: "${skill.renderedMsg}"
+    transitions:
+      next: "classifyConfirm"
+    metadata:
+      virtualComponent: "Virtual.Question"
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        prompt: true
+        requiresAuthorization: false
+  classifyConfirm:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        confirmReply: "${((confirmReply)!'')?replace('<not set>','')}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0
+      maxTokens: 8
+      resultVariable: "confirmResult"
+      standardActions: ""
+      promptTemplate: "The employee was shown a bank account update summary and asked to confirm submitting it. Classify their reply into EXACTLY one word: YES, NO, or EDIT.\n\n- YES: a clear affirmative with NO change requested (yes, yeah, sure, ok, go ahead, confirm, submit, do it, نعم, ايوه, اي, أكيد, تمام, موافق, ارسل, ماشي).\n- EDIT: the employee wants to CHANGE or CORRECT a detail, or gives new/different information (a bank name, account number, IBAN) — EVEN IF the message starts with 'no'. Examples: 'no, the IBAN is SA44...', 'change the account number', 'its Alrajhi not SNB', 'لا الآيبان هو...', 'غير رقم الحساب'.\n- NO: a pure cancel/refusal with NO new detail (no, nope, cancel, stop, never mind, لا, إلغاء, الغاء, كنسل, توقف, مو الان).\n\nIf the reply contains ANY concrete detail (a bank name, a number, an IBAN), choose EDIT, not NO.\n\nEmployee reply: \"${confirmReply}\"\n\nOutput EXACTLY one word: YES, NO, or EDIT."
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment, please..."
+    transitions:
+      next: "switchConfirm"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        outOfScopeKeyword: false
+        enableStreaming: false
+        userPrompt: true
+        outOfScopeMessage: true
+        enableMultiTurn: false
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        promptTemplate: true
+        eventHandler: false
+        retryUserMessage: true
+        llmService: false
+  checkResponse:
+    component: "System.Switch"
+    properties:
+      variable: "bankSubmitResult"
+    transitions:
+      actions:
+        "201": "outputSuccess"
+      next: "showError"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        source: true
+        requiresAuthorization: false
+  switchStatus:
+    component: "System.Switch"
+    properties:
+      variable: "bankStatus"
+    transitions:
+      actions:
+        incomplete: "clearQuestion"
+        complete: "bankHasAttachment"
+        cancel: "outputCancelled"
+        offtopic: "rerouteToLoop"
+      next: "clearQuestion"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        source: true
+        requiresAuthorization: false
+  setBankStatus:
+    component: "System.SetVariable"
+    properties:
+      variable: "bankStatus"
+      value: "${((bankLLMResponse?eval_json.status)!'incomplete')?trim?lower_case}"
+    transitions:
+      next: "switchStatus"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  clearQuestion:
+    component: "System.ResetVariables"
+    properties:
+      variableList: "skill.question"
+    transitions:
+      next: "question"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variableList: false
+        requiresAuthorization: false
+  showError:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.renderedMsg"
+      value: "❌ Your bank account update could not be submitted.\nReason: ${errorReason}\nPlease contact HR for assistance."
+    transitions:
+      next: "showErrorRender"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  showErrorRender:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        langName: "${(skill.userLangName)!'English'}"
+        textEn: "${(skill.renderedMsg)!''}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0
+      maxTokens: 400
+      resultVariable: "skill.renderedMsg"
+      standardActions: ""
+      promptTemplate: "Write the TEXT below in ${langName}.\n\nLANGUAGE — ALREADY DECIDED BY THE SYSTEM, DO NOT DETECT IT:\n- If ${langName} is English, output the TEXT unchanged, character for character.\n- Otherwise translate it completely and naturally into ${langName}, leaving no English words behind.\n- Never mix languages.\n- Keep every emoji, bullet, line break, number, date, currency and proper name exactly as it is and exactly where it is.\n- Do NOT add, remove, soften or invent any information.\n\nOutput ONLY the resulting text. No quotes, no labels, no explanation.\n\nTEXT\n${textEn}\n\nOUTPUT"
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment please... لحظة من فضلك"
+    transitions:
+      actions:
+        error: "showErrorOut"
+      next: "showErrorOut"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  showErrorOut:
+    component: "System.CommonResponse"
+    properties:
+      metadata:
+        responseItems:
+        - text: "${skill.renderedMsg}"
+          type: "text"
+      keepTurn: true
+    transitions:
+      next: "appendTxnHistory"
+    metadata:
+      virtualComponent: "Virtual.Output"
+      propertySheetIsFreeMarkerMap:
+        requiresAuthorization: false
+  invokeBankLLM:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: true
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: true
+      promptTemplateParameters:
+        question: "${((skill.question)!'')?replace('<not set>','')}"
+        origMsg: "${(skill.userQuestion)!''}"
+        history: "${(skill.questionAnswerHistory)!''}"
+        langName: "${(skill.userLangName)!'English'}"
+        iban: "${((iban)!'')?replace('<not set>','')}"
+        bankName: "${((bankName)!'')?replace('<not set>','')}"
+        accountNumber: "${((accountNumber)!'')?replace('<not set>','')}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0
+      maxTokens: 1024
+      resultVariable: "bankLLMResponse"
+      standardActions: ""
+      promptTemplate: "You are a friendly HR assistant helping an employee update their bank account details.\n\n============================\nLANGUAGE — ALREADY DECIDED BY THE SYSTEM, DO NOT DETECT IT\n============================\nWrite EVERY \"message\" ENTIRELY in ${langName}, on every turn. Do NOT detect, guess or switch the language, and do NOT infer it from any text below — the memory and the examples contain both Arabic and English, and none of that affects your output. If ${langName} is Arabic every \"message\" is 100% Arabic; if ${langName} is English every \"message\" is 100% English. Never copy example text verbatim — express the idea in ${langName}. Only the \"message\" text is in ${langName}; all JSON keys and status values are ALWAYS English.\n\n============================\nORIGINAL REQUEST (context only — NOT a language signal)\n============================\n${origMsg}\n\n============================\nCURRENT COLLECTED VALUES\n============================\n- bankName: ${bankName}\n- accountNumber: ${accountNumber}\n- iban: ${iban}\n\n============================\nPREVIOUS CONVERSATION AND PAST TRANSACTIONS (memory)\n============================\n${history}\n\nUse this memory ONLY to resolve explicit references to something earlier — e.g. \"the same bank as before\". NEVER auto-fill a field from memory unless the employee actually referred to it.\n\n============================\nEMPLOYEE JUST SAID (latest input)\n============================\n${question}\n\n============================\nYOUR JOB\n============================\nCollect exactly three fields: bankName, accountNumber, iban.\n- accountNumber is REQUIRED.\n- NEVER ask for, collect, or mention the bank branch. The flow does not use it.\n- Extract values from the employee's message. Keep previously collected values unless the employee changes them.\n- If the employee provides a correction (e.g. \"no, the IBAN is ...\"), update only that field.\n\nSTATUS:\nCASE A - all three (bankName, accountNumber, iban) are collected:\n{\"status\":\"complete\",\"bankName\":\"...\",\"accountNumber\":\"...\",\"iban\":\"...\"}\nDo NOT ask for confirmation. Do NOT include a \"message\" field when complete.\n\nCASE B - something is still missing:\n{\"status\":\"incomplete\",\"bankName\":\"...\",\"accountNumber\":\"...\",\"iban\":\"...\",\"message\":\"short friendly question asking ONLY for the missing field\"}\nAsk for ONLY ONE missing thing at a time. If nothing is collected yet, ask for the bank name first, then account number, then IBAN.\n\nCASE C - gibberish / unclear:\n{\"status\":\"incomplete\",\"bankName\":\"\",\"accountNumber\":\"\",\"iban\":\"\",\"message\":\"<a short message, IN THE ORIGINAL REQUEST'S LANGUAGE, saying you did not catch that and asking for the bank name, account number, and IBAN>\"}\n\nCASE D - the employee wants to CANCEL the bank account update (\"cancel\", \"stop\", \"never mind\", \"الغاء\", \"إلغاء\", \"لا اريد\", \"خلاص\"):\n{\"status\":\"cancel\",\"bankName\":\"\",\"accountNumber\":\"\",\"iban\":\"\"}\n\nCASE E - the employee's LATEST input is a DIFFERENT request entirely — not bank details and not a correction: a greeting alone (hello, مرحبا), leave balance, payslip, attendance, absence history, submitting a leave, a policy question, business trip, personal/employment info:\n{\"status\":\"offtopic\",\"bankName\":\"\",\"accountNumber\":\"\",\"iban\":\"\"}\nIMPORTANT: CHANGING or CORRECTING a detail (\"no, the IBAN is SA44...\", \"بدل رقم الحساب\") is NEVER cancel or offtopic — update the value and continue. An EXPLANATION with extra context is NOT offtopic — extract the useful values and continue.\n\n============================\nRULES\n============================\n- Respond with JSON ONLY. No text before or after the JSON.\n- status is one of: complete, incomplete, cancel, offtopic.\n- Never ask the user to confirm; the flow handles confirmation separately.\n- Never ask for or mention bank branch.\n- The \"message\" field must ALWAYS be in the ORIGINAL REQUEST's language — never English unless the ORIGINAL REQUEST was English.\n- Attachment is handled by the flow, NOT by you. Never ask for attachments."
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment, please..."
+    transitions:
+      next: "cleanBankJson"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        outOfScopeKeyword: false
+        enableStreaming: false
+        userPrompt: true
+        outOfScopeMessage: true
+        enableMultiTurn: false
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        promptTemplate: true
+        eventHandler: false
+        retryUserMessage: true
+        llmService: false
+  resetVariables:
+    component: "System.ResetVariables"
+    properties:
+      variableList: "bankName,accountNumber,iban,bankAttachment,bankAttFileName,bankAttRetry,bankLLMResponse,bankStatus,bankSubmitResult,BankAPIResponse,errorReason,confirmReply,confirmResult"
+    transitions:
+      next: "setnow"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variableList: false
+        requiresAuthorization: false
+  setAccountNumber:
+    component: "System.SetVariable"
+    properties:
+      variable: "accountNumber"
+      value: "${((bankLLMResponse?eval_json.accountNumber)!(accountNumber!''))?replace('<not set>','')}"
+    transitions:
+      next: "setIban"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  question:
+    component: "System.CommonResponse"
+    properties:
+      variable: "skill.question"
+      processUserMessage: true
+      prompt: "${(bankLLMResponse?eval_json.message)!((((skill.userLang)!'en') == 'ar')?then('هل يمكنك تزويدي باسم البنك ورقم الحساب والآيبان؟','Could you give me your bank name, account number, and IBAN?'))}"
+    transitions:
+      next: "invokeBankLLM"
+    metadata:
+      virtualComponent: "Virtual.Question"
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        prompt: true
+        requiresAuthorization: false
+  initBankAttRetry:
+    component: "System.SetVariable"
+    properties:
+      variable: "bankAttRetry"
+      value: "0"
+    transitions:
+      next: "askAttachment"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: false
+        requiresAuthorization: false
+  setBankName:
+    component: "System.SetVariable"
+    properties:
+      variable: "bankName"
+      value: "${((bankLLMResponse?eval_json.bankName)!(bankName!''))?replace('<not set>','')}"
+    transitions:
+      next: "setAccountNumber"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  incrementAttRetry:
+    component: "System.SetVariable"
+    properties:
+      variable: "bankAttRetry"
+      value: "${((bankAttRetry!'0')?number + 1)?c}"
+    transitions:
+      next: "validateAttachment"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  setBankSubmitResult:
+    component: "System.SetVariable"
+    properties:
+      variable: "bankSubmitResult"
+      value: "${BankAPIResponse?string?contains('\"Status\":\"201\"')?then('201','error')}"
+    transitions:
+      next: "extractErrorReason"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  askAttachment:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.renderedMsg"
+      value: "📎 An attachment is required to update your bank account (e.g. a bank letter or IBAN certificate). Please attach a PDF or image now."
+    transitions:
+      next: "askAttachmentRender"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  askAttachmentRender:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        langName: "${(skill.userLangName)!'English'}"
+        textEn: "${(skill.renderedMsg)!''}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0
+      maxTokens: 400
+      resultVariable: "skill.renderedMsg"
+      standardActions: ""
+      promptTemplate: "Write the TEXT below in ${langName}.\n\nLANGUAGE — ALREADY DECIDED BY THE SYSTEM, DO NOT DETECT IT:\n- If ${langName} is English, output the TEXT unchanged, character for character.\n- Otherwise translate it completely and naturally into ${langName}, leaving no English words behind.\n- Never mix languages.\n- Keep every emoji, bullet, line break, number, date, currency and proper name exactly as it is and exactly where it is.\n- Do NOT add, remove, soften or invent any information.\n\nOutput ONLY the resulting text. No quotes, no labels, no explanation.\n\nTEXT\n${textEn}\n\nOUTPUT"
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment please... لحظة من فضلك"
+    transitions:
+      actions:
+        error: "askAttachmentOut"
+      next: "askAttachmentOut"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  askAttachmentOut:
+    component: "System.CommonResponse"
+    properties:
+      metadata:
+        responseItems:
+        - text: "${skill.renderedMsg}"
+          type: "text"
+      keepTurn: true
+    transitions:
+      next: "waitAttachment"
+    metadata:
+      virtualComponent: "Virtual.Output"
+      propertySheetIsFreeMarkerMap:
+        requiresAuthorization: false
+  captureAttFileName:
+    component: "System.SetVariable"
+    properties:
+      variable: "bankAttFileName"
+      value: "${(system.message.messagePayload.attachment.title)!(system.message.messagePayload.attachments[0].title)!(system.message.messagePayload.attachments[0].fileName)!'BankAccount_Attachment'}"
+    transitions:
+      next: "incrementAttRetry"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  outputCancelled:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.renderedMsg"
+      value: "Okay, I've cancelled the bank account update. Tell me again whenever you're ready."
+    transitions:
+      next: "outputCancelledRender"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  outputCancelledRender:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        langName: "${(skill.userLangName)!'English'}"
+        textEn: "${(skill.renderedMsg)!''}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0
+      maxTokens: 400
+      resultVariable: "skill.renderedMsg"
+      standardActions: ""
+      promptTemplate: "Write the TEXT below in ${langName}.\n\nLANGUAGE — ALREADY DECIDED BY THE SYSTEM, DO NOT DETECT IT:\n- If ${langName} is English, output the TEXT unchanged, character for character.\n- Otherwise translate it completely and naturally into ${langName}, leaving no English words behind.\n- Never mix languages.\n- Keep every emoji, bullet, line break, number, date, currency and proper name exactly as it is and exactly where it is.\n- Do NOT add, remove, soften or invent any information.\n\nOutput ONLY the resulting text. No quotes, no labels, no explanation.\n\nTEXT\n${textEn}\n\nOUTPUT"
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment please... لحظة من فضلك"
+    transitions:
+      actions:
+        error: "outputCancelledOut"
+      next: "outputCancelledOut"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  outputCancelledOut:
+    component: "System.CommonResponse"
+    properties:
+      metadata:
+        responseItems:
+        - text: "${skill.renderedMsg}"
+          type: "text"
+      keepTurn: true
+    transitions:
+      next: "appendTxnHistory"
+    metadata:
+      virtualComponent: "Virtual.Output"
+      propertySheetIsFreeMarkerMap:
+        requiresAuthorization: false
+  switchConfirm:
+    component: "System.Switch"
+    properties:
+      source: "${(confirmResult!'')?upper_case?contains('EDIT')?then('EDIT',(confirmResult!'')?upper_case?contains('YES')?then('YES','NO'))}"
+    transitions:
+      actions:
+        EDIT: "applyEdit"
+        "NO": "outputCancelled"
+        "YES": "callBankAPI"
+      next: "outputCancelled"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        source: true
+        requiresAuthorization: false
+  applyEdit:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.question"
+      value: "${(confirmReply!'')?replace('<not set>','')}"
+    transitions:
+      next: "invokeBankLLM"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  rerouteToLoop:
+    component: "System.InvokeFlow"
+    properties:
+      inputParameters:
+      - name: "lastTool"
+        value: "init"
+      - name: "lastToolResult"
+        value: "none"
+      flow: "loopFlow"
+      outputParameters: []
+    transitions: {}
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        flow: false
+  cleanBankJson:
+    component: "System.SetVariable"
+    properties:
+      variable: "bankLLMResponse"
+      value: "${\"{\" + (bankLLMResponse?keep_after(\"{\"))?keep_before_last(\"}\") + \"}\"}"
+    transitions:
+      next: "setBankName"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  setnow:
+    component: "System.SetVariable"
+    properties:
+      variable: "now"
+      value: "${.now?string('yyyy-MM-dd')}"
+    transitions:
+      next: "invokeBankLLM"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  validateAttachment:
+    component: "System.Switch"
+    properties:
+      source: "${((bankAttachment!'')?lower_case?starts_with('http'))?then('OK',((bankAttRetry!'0')?number gte 2)?then('GIVEUP','MISSING'))}"
+    transitions:
+      actions:
+        GIVEUP: "attachmentFailed"
+        OK: "clearConfirmReply"
+        MISSING: "askAttachment"
+      next: "attachmentFailed"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        source: true
+        requiresAuthorization: false
+  bankHasAttachment:
+    component: "System.Switch"
+    properties:
+      source: "${((bankAttachment!'')?lower_case?starts_with('http'))?then('HAVE','NEED')}"
+    transitions:
+      actions:
+        HAVE: "clearConfirmReply"
+        NEED: "initBankAttRetry"
+      next: "initBankAttRetry"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        source: true
+        requiresAuthorization: false
+  clearConfirmReply:
+    component: "System.ResetVariables"
+    properties:
+      variableList: "confirmReply,confirmResult"
+    transitions:
+      next: "confirmSummaryPrep"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variableList: false
+        requiresAuthorization: false
+  captureAttachment:
+    component: "System.SetVariable"
+    properties:
+      variable: "bankAttachment"
+      value: "${(system.message.messagePayload.attachment.url)!(system.message.messagePayload.attachments[0].url)!(system.message.messagePayload.attachments[0].contentUrl)!(system.message.messagePayload.channelExtensions.attachment.url)!(system.message.messagePayload.channelExtensions.attachments[0].contentUrl)!((((bankAttachment)!'')?lower_case?starts_with('http'))?then((bankAttachment)!'',''))}"
+    transitions:
+      next: "captureAttFileName"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  waitAttachment:
+    component: "System.CommonResponse"
+    properties:
+      maxPrompts: 1
+      variable: "bankAttachment"
+      processUserMessage: true
+      keepTurn: false
+      prompt: "📎"
+    transitions:
+      next: "captureAttachment"
+    metadata:
+      virtualComponent: "Virtual.Question"
+      propertySheetIsFreeMarkerMap:
+        maxPrompts: false
+        variable: false
+        processUserMessage: false
+        keepTurn: false
+        prompt: true
+        requiresAuthorization: false
+  outputSuccess:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.renderedMsg"
+      value: "✅ Your bank account details have been submitted successfully. You will receive a confirmation once approved."
+    transitions:
+      next: "outputSuccessRender"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  outputSuccessRender:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        langName: "${(skill.userLangName)!'English'}"
+        textEn: "${(skill.renderedMsg)!''}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0
+      maxTokens: 400
+      resultVariable: "skill.renderedMsg"
+      standardActions: ""
+      promptTemplate: "Write the TEXT below in ${langName}.\n\nLANGUAGE — ALREADY DECIDED BY THE SYSTEM, DO NOT DETECT IT:\n- If ${langName} is English, output the TEXT unchanged, character for character.\n- Otherwise translate it completely and naturally into ${langName}, leaving no English words behind.\n- Never mix languages.\n- Keep every emoji, bullet, line break, number, date, currency and proper name exactly as it is and exactly where it is.\n- Do NOT add, remove, soften or invent any information.\n\nOutput ONLY the resulting text. No quotes, no labels, no explanation.\n\nTEXT\n${textEn}\n\nOUTPUT"
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment please... لحظة من فضلك"
+    transitions:
+      actions:
+        error: "outputSuccessOut"
+      next: "outputSuccessOut"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  outputSuccessOut:
+    component: "System.CommonResponse"
+    properties:
+      metadata:
+        responseItems:
+        - text: "${skill.renderedMsg}"
+          type: "text"
+      keepTurn: true
+    transitions:
+      next: "appendTxnHistory"
+    metadata:
+      virtualComponent: "Virtual.Output"
+      propertySheetIsFreeMarkerMap:
+        requiresAuthorization: false
+  appendTxnHistory:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.questionAnswerHistory"
+      value: "${(skill.questionAnswerHistory)!''}\n\n### Question\n${(skill.userQuestion)!''}\n### Transaction\nBank account update — bank: ${(bankName)!'-'}, account: ${(accountNumber)!'-'}, iban: ${(iban)!'-'}, apiResult: ${(bankSubmitResult)!'not submitted'}"
+    transitions: {}
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  extractErrorReason:
+    component: "System.SetVariable"
+    properties:
+      variable: "errorReason"
+      value: "${((BankAPIResponse?string)!'')?contains('\"ErrorReason\":\"')?then(((BankAPIResponse?string)!'')?keep_after('\"ErrorReason\":\"')?keep_before('\"'),'Please contact HR for details.')}"
+    transitions:
+      next: "checkResponse"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false

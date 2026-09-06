@@ -1,0 +1,229 @@
+name: "employmentAgent"
+trackingId: "AAAA000C-0000-0000-0000-00000000000C"
+type: "task"
+version: "2.0"
+interface: {}
+configuration:
+  requiresAuthorization: false
+  defaultApplicationContext: false
+  privateThread: false
+defaultTransitions:
+  actions:
+    system.startTaskFlow: "callEmploymentAPI"
+states:
+  appendHistory:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.questionAnswerHistory"
+      value: "${(skill.questionAnswerHistory)!''}\n\n### Question\n${(skill.userQuestion)!''}\n### Answer\n${skill.finalAnswer}"
+    transitions: {}
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  returnError:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.renderedMsg"
+      value: "The employment details service is temporarily unavailable. Please try again later."
+    transitions:
+      next: "returnErrorRender"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  returnErrorRender:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        langName: "${(skill.userLangName)!'English'}"
+        textEn: "${(skill.renderedMsg)!''}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0
+      maxTokens: 400
+      resultVariable: "skill.renderedMsg"
+      standardActions: ""
+      promptTemplate: "Write the TEXT below in ${langName}.\n\nLANGUAGE — ALREADY DECIDED BY THE SYSTEM, DO NOT DETECT IT:\n- If ${langName} is English, output the TEXT unchanged, character for character.\n- Otherwise translate it completely and naturally into ${langName}, leaving no English words behind.\n- Never mix languages.\n- Keep every emoji, bullet, line break, number, date, currency and proper name exactly as it is and exactly where it is.\n- Do NOT add, remove, soften or invent any information.\n\nOutput ONLY the resulting text. No quotes, no labels, no explanation.\n\nTEXT\n${textEn}\n\nOUTPUT"
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment please... لحظة من فضلك"
+    transitions:
+      actions:
+        error: "returnErrorOut"
+      next: "returnErrorOut"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  returnErrorOut:
+    component: "System.CommonResponse"
+    properties:
+      metadata:
+        responseItems:
+        - text: "${skill.renderedMsg}"
+          type: "text"
+      keepTurn: true
+    transitions: {}
+    metadata:
+      virtualComponent: "Virtual.Output"
+      propertySheetIsFreeMarkerMap:
+        requiresAuthorization: false
+  callEmploymentAPI:
+    component: "System.CallRestService"
+    properties:
+      authConfigType: "basicAuth"
+      restService: "GETEmploymentInformation"
+      endpoint: "https://aljent-oic-jed-prod01-lrwl7ouc1vb3-je.integration.me-jeddah-1.ocp.oraclecloud.com/ic/api/integration/v1/flows/rest/EMP_ASSIGNME_DETAILS_INT/1.0/getEmpDetails"
+      responseConfig: "apiResponse"
+      requestHeaders: []
+      method: "GET"
+      requestParameters:
+      - type: "query"
+        value: "alhassanhf@alj.com"
+        key: "email"
+      - type: "query"
+        value: "${(profile.properties.value.personId)!''}"
+        key: "PersonID"
+      resultVariable: "skill.restResp"
+    transitions:
+      actions:
+        error: "returnError"
+      next: "composeAnswer"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        requestParameters--Item--type: false
+        method: false
+        apiKeyValueVariable: false
+        passwordVariable: false
+        tokenVariable: false
+        requestHeaders--Item--key: false
+        authConfigType: false
+        restService: false
+        endpoint: false
+        responseConfig: false
+        requestBody: false
+        resultVariable: false
+        requiresAuthorization: false
+  presenterFallback:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.finalAnswer"
+      value: "I could not retrieve your employment details right now. Please try again in a moment.\n\nلم أتمكن من جلب بياناتك الوظيفية حالياً. يرجى المحاولة مرة أخرى بعد قليل."
+    transitions:
+      next: "outputDirect"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  composeAnswer:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: true
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        businessUnit: "${(skill.restResp.value.responsePayload.BusinessUnitName)!(skill.restResp.value.responsePayload.businessUnitName)!(skill.restResp.value.responsePayload.BusinessUnit)!''}"
+        field: "${(user.tool.value.field)!''}"
+        manager: "${(skill.restResp.value.responsePayload.ManagerName)!(skill.restResp.value.responsePayload.managerName)!(skill.restResp.value.responsePayload.LineManagerName)!(skill.restResp.value.responsePayload.lineManagerName)!(skill.restResp.value.responsePayload.LineManager)!(skill.restResp.value.responsePayload.SupervisorName)!(skill.restResp.value.responsePayload.supervisorName)!(skill.restResp.value.responsePayload.Manager)!(skill.restResp.value.responsePayload.ReportingManager)!''}"
+        grade: "${(skill.restResp.value.responsePayload.GradeName)!(skill.restResp.value.responsePayload.gradeName)!(skill.restResp.value.responsePayload.Grade)!''}"
+        employer: "${(skill.restResp.value.responsePayload.LegalEmployerName)!(skill.restResp.value.responsePayload.legalEmployerName)!(skill.restResp.value.responsePayload.EmployerName)!(skill.restResp.value.responsePayload.Employer)!(skill.restResp.value.responsePayload.CompanyName)!''}"
+        location: "${(skill.restResp.value.responsePayload.LocationName)!(skill.restResp.value.responsePayload.locationName)!(skill.restResp.value.responsePayload.Location)!(skill.restResp.value.responsePayload.location)!''}"
+        position: "${(skill.restResp.value.responsePayload.PositionName)!(skill.restResp.value.responsePayload.positionName)!(skill.restResp.value.responsePayload.Position)!(skill.restResp.value.responsePayload.position)!(skill.restResp.value.responsePayload.JobTitle)!(skill.restResp.value.responsePayload.jobTitle)!(skill.restResp.value.responsePayload.Designation)!''}"
+        job: "${(skill.restResp.value.responsePayload.JobName)!(skill.restResp.value.responsePayload.jobName)!(skill.restResp.value.responsePayload.Job)!(skill.restResp.value.responsePayload.job)!''}"
+        department: "${(skill.restResp.value.responsePayload.DepartmentName)!(skill.restResp.value.responsePayload.departmentName)!(skill.restResp.value.responsePayload.Department)!(skill.restResp.value.responsePayload.department)!''}"
+        langName: "${(skill.userLangName)!'English'}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0.2
+      maxTokens: 256
+      resultVariable: "skill.finalAnswer"
+      standardActions: ""
+      promptTemplate: "You are Ameen, an HR assistant. Answer the employee's question about their employment record using ONLY the fields provided below.\n\nLANGUAGE — ALREADY DECIDED BY THE SYSTEM, DO NOT DETECT IT:\nWrite the ENTIRE reply in ${langName}. Do NOT detect or guess the language from any text, and never mix languages.\n\nThe employee is asking about this detail (hint): ${field}\n\nEMPLOYMENT FIELDS FROM HR SYSTEM (a field is blank if not provided):\n- Manager: ${manager}\n- Position: ${position}\n- Job: ${job}\n- Department: ${department}\n- Employer: ${employer}\n- Business Unit: ${businessUnit}\n- Location: ${location}\n- Grade: ${grade}\n\nINSTRUCTIONS:\n- Pick the field that best answers the employee's question (match by meaning) and write ONE short, friendly sentence giving them that value (e.g. \"Your manager is Ahmed Ali.\", \"Your position is Senior Accountant.\").\n- If the field that answers their question is blank above, politely say you could not find that specific detail in their records, and if helpful mention one or two details you DO have.\n- Output ONLY the sentence — no labels, no JSON, no quotes, no field keys, no extra text."
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment please... لحظة من فضلك"
+    transitions:
+      actions:
+        error: "presenterFallback"
+      next: "outputDirect"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  outputDirect:
+    component: "System.CommonResponse"
+    properties:
+      metadata:
+        responseItems:
+        - text: "${skill.finalAnswer}"
+          type: "text"
+      keepTurn: true
+    transitions:
+      next: "appendHistory"
+    metadata:
+      virtualComponent: "Virtual.Output"
+      propertySheetIsFreeMarkerMap:
+        requiresAuthorization: false

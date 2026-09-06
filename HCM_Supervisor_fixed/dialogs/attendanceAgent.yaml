@@ -1,0 +1,532 @@
+name: "attendanceAgent"
+trackingId: "AAAA0011-0000-0000-0000-000000000011"
+type: "task"
+version: "2.0"
+interface: {}
+configuration:
+  requiresAuthorization: false
+  defaultApplicationContext: false
+  privateThread: false
+variables:
+- name: "rangeLLMResponse"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "startDate"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "endDate"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "rangeStatus"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "now"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+defaultTransitions:
+  actions:
+    system.startTaskFlow: "resetVariables"
+states:
+  resetVariables:
+    component: "System.ResetVariables"
+    properties:
+      variableList: "rangeLLMResponse,startDate,endDate,rangeStatus,now"
+    transitions:
+      next: "setnow"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variableList: false
+        requiresAuthorization: false
+  setnow:
+    component: "System.SetVariable"
+    properties:
+      variable: "now"
+      value: "${.now?string('yyyy-MM-dd')}"
+    transitions:
+      next: "invokeRangeLLM"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  invokeRangeLLM:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: true
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: true
+      promptTemplateParameters:
+        question: "${((skill.question)!'')?replace('<not set>','')}"
+        origMsg: "${(skill.userQuestion)!''}"
+        langName: "${(skill.userLangName)!'English'}"
+        startDate: "${((startDate)!'')?replace('<not set>','')}"
+        endDate: "${((endDate)!'')?replace('<not set>','')}"
+        now: "${now}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0
+      maxTokens: 256
+      resultVariable: "rangeLLMResponse"
+      standardActions: ""
+      promptTemplate: "You are helping an employee retrieve their ATTENDANCE history for a date range.\n\nToday's date is ${now}.\n\n============================\nLANGUAGE — ALREADY DECIDED BY THE SYSTEM, DO NOT DETECT IT\n============================\nWrite every \"message\" ENTIRELY in ${langName}, on every turn. Do NOT detect, guess or switch the language, and do NOT infer it from any text below — the examples and the memory contain both Arabic and English, and none of that affects your output. If ${langName} is Arabic every \"message\" is 100% Arabic; if ${langName} is English every \"message\" is 100% English. Never copy example text verbatim — express the idea in ${langName}. All JSON keys and status values are ALWAYS English.\n\n============================\nORIGINAL REQUEST (context only — NOT a language signal)\n============================\n${origMsg}\n\n============================\nCURRENT COLLECTED VALUES\n============================\n- startDate: ${startDate}\n- endDate: ${endDate}\n\n============================\nEMPLOYEE JUST SAID (latest input)\n============================\n${question}\n\n============================\nYOUR JOB\n============================\nDetermine the DATE RANGE (startDate and endDate, both YYYY-MM-DD) for the attendance history the employee wants.\n\nRULES:\n- A month name alone (\"december\", \"ديسمبر\"): if it is the CURRENT month → startDate = 1st of the month, endDate = today. If a past month this year → full month. If that month has not started yet this year → use the same month of the PREVIOUS year (full month).\n- \"last month\" / \"الشهر الماضي\" → full previous calendar month.\n- \"this month\" / \"هذا الشهر\" → 1st of current month to today.\n- \"last week\" / \"الأسبوع الماضي\" → the previous 7 days ending today.\n- \"last N weeks\" / \"اخر N اسابيع\" → today minus N*7 days to today. \"last N days\" / \"اخر N ايام\" → today minus N days to today. \"last N months\" / \"اخر N شهور\" (N ≤ 3) → today minus N months to today; if N > 3 apply the 3-month maximum rule below.\n- \"from X to Y\" → the given range. If only a start is given (\"since december\") → endDate = today.\n- Accept English and Arabic month names and numeric forms (\"12/2025\").\n- endDate must never be after today — cap it at today.\n- MAXIMUM RANGE: 3 months. If the employee asks for a longer range (e.g. \"this year\", \"last 6 months\"), output status incomplete with a message (in their language) politely explaining attendance history can be shown up to 3 months at a time and asking which period they want.\n- Keep previously collected values unless the employee changes them.\n\n============================\nSTATUS\n============================\nCASE A — range determined:\n{\"status\":\"complete\",\"startDate\":\"YYYY-MM-DD\",\"endDate\":\"YYYY-MM-DD\"}\nNo \"message\" field. Do NOT ask for confirmation.\n\nCASE B — range NOT determined (no period mentioned, or range too long):\n{\"status\":\"incomplete\",\"startDate\":\"\",\"endDate\":\"\",\"message\":\"<ONE short friendly question, written in ${langName}, asking for which period they want their attendance, e.g. a month like December, last month, or from one date to another>\"}\n\nCASE C — the employee wants to CANCEL (\"cancel\", \"stop\", \"never mind\", \"الغاء\", \"إلغاء\", \"لا اريد\", \"خلاص\"):\n{\"status\":\"cancel\",\"startDate\":\"\",\"endDate\":\"\"}\n\nCASE D — the employee's LATEST input is a DIFFERENT request entirely — not a period and not about this attendance history: a greeting (hello, مرحبا), leave balance, payslip, submitting a leave, absence history, a policy question, personal/employment info, or anything else off-topic:\n{\"status\":\"offtopic\",\"startDate\":\"\",\"endDate\":\"\"}\nIMPORTANT: a message that repeats the SAME attendance request but still without a period (e.g. \"my attendance\") is CASE B (ask again), NOT offtopic.\n\n============================\nEXAMPLES (assume today = 2026-07-15)\n============================\n\"show my attendance for december\" → {\"status\":\"complete\",\"startDate\":\"2025-12-01\",\"endDate\":\"2025-12-31\"}\n\"my attendance last month\" → {\"status\":\"complete\",\"startDate\":\"2026-06-01\",\"endDate\":\"2026-06-30\"}\n\"attendance this month\" → {\"status\":\"complete\",\"startDate\":\"2026-07-01\",\"endDate\":\"2026-07-15\"}\n\"my attendance from 1 june to 20 june\" → {\"status\":\"complete\",\"startDate\":\"2026-06-01\",\"endDate\":\"2026-06-20\"}\n\"سجل حضوري لشهر يونيو\" → {\"status\":\"complete\",\"startDate\":\"2026-06-01\",\"endDate\":\"2026-06-30\"}\n\"my attendance history\" → {\"status\":\"incomplete\",\"startDate\":\"\",\"endDate\":\"\",\"message\":\"Sure — for which period would you like your attendance? You can say a month like June, last month, or a date range.\"}\n\"attendance for this year\" → {\"status\":\"incomplete\",\"startDate\":\"\",\"endDate\":\"\",\"message\":\"I can show attendance for up to 3 months at a time — which period would you like?\"}\n\"cancel\" → {\"status\":\"cancel\",\"startDate\":\"\",\"endDate\":\"\"}\n\"الغاء\" → {\"status\":\"cancel\",\"startDate\":\"\",\"endDate\":\"\"}\n\"hello\" → {\"status\":\"offtopic\",\"startDate\":\"\",\"endDate\":\"\"}\n\"what is my leave balance\" → {\"status\":\"offtopic\",\"startDate\":\"\",\"endDate\":\"\"}\n\n============================\nRULES\n============================\n- Respond with JSON ONLY. No text before or after.\n- ALWAYS output all three fields: status, startDate, endDate (use \"\" when unknown). status is one of: complete, incomplete, cancel, offtopic.\n- The \"message\" field must be written in ${langName}."
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment, please..."
+    transitions:
+      next: "cleanRangeJson"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        outOfScopeKeyword: false
+        enableStreaming: false
+        userPrompt: true
+        outOfScopeMessage: true
+        enableMultiTurn: false
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        promptTemplate: true
+        eventHandler: false
+        retryUserMessage: true
+        llmService: false
+  cleanRangeJson:
+    component: "System.SetVariable"
+    properties:
+      variable: "rangeLLMResponse"
+      value: "${\"{\" + (rangeLLMResponse?keep_after(\"{\"))?keep_before_last(\"}\") + \"}\"}"
+    transitions:
+      next: "setStartDate"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  setStartDate:
+    component: "System.SetVariable"
+    properties:
+      variable: "startDate"
+      value: "${((rangeLLMResponse?eval_json.startDate)!(startDate!''))?replace('<not set>','')}"
+    transitions:
+      next: "setEndDate"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  setEndDate:
+    component: "System.SetVariable"
+    properties:
+      variable: "endDate"
+      value: "${((rangeLLMResponse?eval_json.endDate)!(endDate!''))?replace('<not set>','')}"
+    transitions:
+      next: "setRangeStatus"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  setRangeStatus:
+    component: "System.SetVariable"
+    properties:
+      variable: "rangeStatus"
+      value: "${(rangeLLMResponse?eval_json.status)!'incomplete'}"
+    transitions:
+      next: "switchRangeStatus"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  switchRangeStatus:
+    component: "System.Switch"
+    properties:
+      variable: "rangeStatus"
+    transitions:
+      actions:
+        incomplete: "clearQuestion"
+        complete: "callAttendanceAPI"
+        cancel: "presentCancelled"
+        offtopic: "rerouteToLoop"
+      next: "clearQuestion"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        source: true
+        requiresAuthorization: false
+  presentCancelled:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        langName: "${(skill.userLangName)!'English'}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0.2
+      maxTokens: 128
+      resultVariable: "skill.finalAnswer"
+      standardActions: ""
+      promptTemplate: "Write ONE short, polite message confirming that the attendance-history request has been cancelled and that you are happy to help with anything else.\n\nLANGUAGE — write the message ENTIRELY in ${langName}. The language is already decided by the system: do NOT detect it, guess it, or mix languages.\n\nOutput ONLY the message text, no quotes, no labels."
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment please... لحظة من فضلك"
+    transitions:
+      actions:
+        error: "presenterFallback"
+      next: "outputDirect"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  rerouteToLoop:
+    component: "System.InvokeFlow"
+    properties:
+      inputParameters:
+      - name: "lastTool"
+        value: "init"
+      - name: "lastToolResult"
+        value: "none"
+      flow: "loopFlow"
+      outputParameters: []
+    transitions: {}
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        flow: false
+  clearQuestion:
+    component: "System.ResetVariables"
+    properties:
+      variableList: "skill.question"
+    transitions:
+      next: "question"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variableList: false
+        requiresAuthorization: false
+  question:
+    component: "System.CommonResponse"
+    properties:
+      variable: "skill.question"
+      processUserMessage: true
+      prompt: "${(rangeLLMResponse?eval_json.message)!((((skill.userLang)!'en') == 'ar')?then('لأي فترة تريد سجل الحضور؟','For which period would you like your attendance?'))}"
+    transitions:
+      next: "invokeRangeLLM"
+    metadata:
+      virtualComponent: "Virtual.Question"
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        prompt: true
+        requiresAuthorization: false
+  callAttendanceAPI:
+    component: "System.CallRestService"
+    properties:
+      authConfigType: "basicAuth"
+      restService: "AttandanceHistory"
+      endpoint: "https://aljent-oic-jed-prod01-lrwl7ouc1vb3-je.integration.me-jeddah-1.ocp.oraclecloud.com/ic/api/integration/v1/flows/rest/EMP_ATTEND_HISTOR_REPORT_INT/1.0/AttendanceHistory"
+      responseConfig: "apiResponse"
+      requestHeaders: []
+      method: "GET"
+      requestParameters:
+      - type: "query"
+        value: "${(profile.email)!''}"
+        key: "email"
+      - type: "query"
+        value: "${(profile.properties.value.personId)!''}"
+        key: "personID"
+      - type: "query"
+        value: "${startDate}"
+        key: "fromDate"
+      - type: "query"
+        value: "${endDate}"
+        key: "toDate"
+      resultVariable: "skill.restResp"
+    transitions:
+      actions:
+        error: "presentServiceError"
+      next: "checkAnswered"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        authConfigType: false
+        requestParameters--Item--type: false
+        restService: false
+        endpoint: false
+        responseConfig: false
+        method: false
+        requestBody: false
+        apiKeyValueVariable: false
+        passwordVariable: false
+        tokenVariable: false
+        resultVariable: false
+        requiresAuthorization: false
+  checkAnswered:
+    component: "System.Switch"
+    properties:
+      source: "${((skill.restResp.value.statusCode!0)?number == 200)?then('OK','BAD')}"
+    transitions:
+      actions:
+        OK: "presentAttendance"
+        BAD: "presentNoData"
+      next: "presentNoData"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        source: true
+        requiresAuthorization: false
+  presentAttendance:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: true
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        langName: "${(skill.userLangName)!'English'}"
+        fromDate: "${(startDate)!''}"
+        toDate: "${(endDate)!''}"
+        attendanceJson: "${(skill.restResp?string)!''}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0.2
+      maxTokens: 1024
+      resultVariable: "skill.finalAnswer"
+      standardActions: ""
+      promptTemplate: "You are Ameen, an HR assistant. Present the employee's ATTENDANCE history as a clean table using ONLY the data in the JSON below.\n\nLANGUAGE — ALREADY DECIDED BY THE SYSTEM, DO NOT DETECT IT:\nWrite the ENTIRE message in ${langName}. Do NOT detect or guess the language from any text, and never mix languages.\n\nRequested period: ${fromDate} to ${toDate}\n\nRAW ATTENDANCE SERVICE RESPONSE (JSON):\n${attendanceJson}\n\nRECORD FIELDS (each attendance record in the JSON has these):\n- attendanceDate: the day, in DD-MM-YYYY format (e.g. \"05-07-2026\" means 5 July 2026)\n- attendanceDay: weekday name, may have trailing spaces — trim it\n- entryTime / exitTime: clock times like \"09:36 AM\", \"06:55 PM\"\n- Duration: hours worked as HH:MM (e.g. \"09:19\" means 9 hours 19 minutes) — this is NOT a decimal number\n- dayStatus: e.g. \"Working Day\", \"Hours Leave\", or another status\n\nINSTRUCTIONS:\n- Find the attendance records inside the JSON (ignore technical wrapper fields like statusCode, headers).\n\n- STEP 1 — ONE LINE PER CALENDAR DAY. The service often returns SEVERAL records for the SAME attendanceDate: one real record with worked hours, plus badge-punch artifacts where Duration is \"00:00\" and entryTime equals exitTime. For each date:\n  * If the date has a record with a real Duration (anything other than \"00:00\"), use ONLY that record and silently DISCARD the 00:00 artifact rows for that same date.\n  * If the date has ONLY a 00:00 record, keep the day but show no times (see the no-hours line below).\n  * Never print the same date twice.\n\n- STEP 2 — ORDER: oldest first.\n\n- STEP 3 — FORMAT (Option A). One block:\nLine 1: 📊 <the word Attendance in the employee's language> · <short period, e.g. 8 Jul → 5 Aug 2026>\n(blank line)\nThen ONE line per day, in this exact shape:\n<Weekday> <day> <Month> · <entryTime> → <exitTime> · <Duration>\nExample: Wed 8 Jul · 09:31 AM → 06:38 PM · 9:07\n\n- SHORT DATES: convert attendanceDate (DD-MM-YYYY) into a short readable date — 3-letter weekday, day number without a leading zero, 3-letter month. \"08-07-2026\" + attendanceDay \"Wednesday\" → \"Wed 8 Jul\". Never print the raw DD-MM-YYYY string and never repeat the year on a row.\n- DURATION: strip the leading zero — \"09:07\" → \"9:07\", \"10:51\" stays \"10:51\". Never convert to decimal.\n- STATUS: do NOT print \"Working Day\" — it is the normal case and only adds noise. Print the status ONLY when it is something else, at the end of the line with an emoji: ⏱️ Hours Leave, 🏖️ Week End, 🎉 Holiday, 📌 anything else.\n- NO-HOURS DAYS: when a day has no real worked hours, drop the times entirely and show just: <Weekday> <day> <Month> · <emoji> <status>  — e.g. \"Mon 20 Jul · ⏱️ Hours Leave\", \"Sat 25 Jul · 🏖️ Week End\".\n\n- Keep every time and Duration EXACTLY as it appears in the JSON (apart from stripping the leading zero of Duration). Never recalculate, round, or invent values. Never compute totals or averages.\n- THE ENTIRE MESSAGE MUST BE IN ${langName} — the intro line, weekdays, months and statuses, all of it. English → English weekdays (Sun, Mon, Tue, Wed, Thu, Fri, Sat), English months (Jan…Dec), English statuses. Arabic → Arabic weekdays (الأحد، الإثنين، الثلاثاء، الأربعاء، الخميس، الجمعة، السبت), Arabic months (يناير…ديسمبر), Arabic statuses (إذن ساعات، عطلة نهاية الأسبوع). NEVER mix languages in one message.\n- If there are NO records at all, politely say no attendance records were found for that period and suggest another period.\n- Output ONLY the message text — no JSON, no code fences, no header row, no raw field names, no markdown asterisks, no URLs."
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment please... لحظة من فضلك"
+    transitions:
+      actions:
+        error: "presenterFallback"
+      next: "outputDirect"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  presentNoData:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        langName: "${(skill.userLangName)!'English'}"
+        fromDate: "${(startDate)!''}"
+        toDate: "${(endDate)!''}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0.2
+      maxTokens: 160
+      resultVariable: "skill.finalAnswer"
+      standardActions: ""
+      promptTemplate: "Write ONE short, polite message telling the employee that no attendance records were found for the period ${fromDate} to ${toDate}, and suggesting they try another period.\n\nLANGUAGE — write the message ENTIRELY in ${langName}. The language is already decided by the system: do NOT detect it, guess it, or mix languages.\n\nOutput ONLY the message text, no quotes, no labels."
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment please... لحظة من فضلك"
+    transitions:
+      actions:
+        error: "presenterFallback"
+      next: "outputDirect"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  presentServiceError:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        langName: "${(skill.userLangName)!'English'}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0.2
+      maxTokens: 128
+      resultVariable: "skill.finalAnswer"
+      standardActions: ""
+      promptTemplate: "Write ONE short, polite message telling the employee that the attendance service is temporarily unavailable and to please try again in a little while.\n\nLANGUAGE — write the message ENTIRELY in ${langName}. The language is already decided by the system: do NOT detect it, guess it, or mix languages.\n\nOutput ONLY the message text, no quotes, no labels."
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment please... لحظة من فضلك"
+    transitions:
+      actions:
+        error: "presenterFallback"
+      next: "outputDirect"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  presenterFallback:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.finalAnswer"
+      value: "I could not retrieve your attendance history right now. Please try again in a moment.\n\nلم أتمكن من جلب سجل الحضور حالياً. يرجى المحاولة مرة أخرى بعد قليل."
+    transitions:
+      next: "outputDirect"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  outputDirect:
+    component: "System.CommonResponse"
+    properties:
+      metadata:
+        responseItems:
+        - text: "${skill.finalAnswer}"
+          type: "text"
+      keepTurn: true
+    transitions:
+      next: "appendHistory"
+    metadata:
+      virtualComponent: "Virtual.Output"
+      propertySheetIsFreeMarkerMap:
+        requiresAuthorization: false
+  appendHistory:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.questionAnswerHistory"
+      value: "${(skill.questionAnswerHistory)!''}\n\n### Question\n${(skill.userQuestion)!''}\n### Answer\n${skill.finalAnswer}"
+    transitions: {}
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false

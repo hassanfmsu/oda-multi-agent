@@ -1,0 +1,93 @@
+name: "salaryAgent"
+trackingId: "AAAA0009-0000-0000-0000-000000000009"
+type: "task"
+version: "2.0"
+interface: {}
+configuration:
+  requiresAuthorization: false
+  defaultApplicationContext: false
+  privateThread: false
+defaultTransitions:
+  actions:
+    system.startTaskFlow: "outputSalary"
+states:
+  outputSalary:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.renderedMsg"
+      value: "Salary and compensation information is not available yet, but it will be coming soon. Thank you for your patience."
+    transitions:
+      next: "outputSalaryRender"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  outputSalaryRender:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        langName: "${(skill.userLangName)!'English'}"
+        textEn: "${(skill.renderedMsg)!''}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0
+      maxTokens: 400
+      resultVariable: "skill.renderedMsg"
+      standardActions: ""
+      promptTemplate: "Write the TEXT below in ${langName}.\n\nLANGUAGE — ALREADY DECIDED BY THE SYSTEM, DO NOT DETECT IT:\n- If ${langName} is English, output the TEXT unchanged, character for character.\n- Otherwise translate it completely and naturally into ${langName}, leaving no English words behind.\n- Never mix languages.\n- Keep every emoji, bullet, line break, number, date, currency and proper name exactly as it is and exactly where it is.\n- Do NOT add, remove, soften or invent any information.\n\nOutput ONLY the resulting text. No quotes, no labels, no explanation.\n\nTEXT\n${textEn}\n\nOUTPUT"
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment please... لحظة من فضلك"
+    transitions:
+      actions:
+        error: "outputSalaryOut"
+      next: "outputSalaryOut"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  outputSalaryOut:
+    component: "System.CommonResponse"
+    properties:
+      metadata:
+        responseItems:
+        - text: "${skill.renderedMsg}"
+          type: "text"
+      keepTurn: true
+    transitions: {}
+    metadata:
+      virtualComponent: "Virtual.Output"
+      propertySheetIsFreeMarkerMap:
+        requiresAuthorization: false

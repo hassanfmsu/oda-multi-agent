@@ -1,0 +1,93 @@
+name: "helloAgent"
+trackingId: "AAAA0008-0000-0000-0000-000000000008"
+type: "task"
+version: "2.0"
+interface: {}
+configuration:
+  requiresAuthorization: false
+  defaultApplicationContext: false
+  privateThread: false
+defaultTransitions:
+  actions:
+    system.startTaskFlow: "generateGreeting"
+states:
+  fallbackGreeting:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.finalAnswer"
+      value: "<#if ((skill.userLang)!'en') == 'ar'>مرحباً! أنا أمين، مساعد الموارد البشرية. يمكنني مساعدتك في الإجازات والأرصدة والبيانات الشخصية والوظيفية وتأشيرات الخروج والعودة وسياسات الشركة. كيف يمكنني خدمتك؟<#else>Hello! I'm Ameen, your HR assistant. I can help with leave requests and balances, personal and employment details, exit/re-entry visas, and company policies. How can I help you?</#if>"
+    transitions:
+      next: "outputGreeting"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  generateGreeting:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: true
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        firstName: "${(profile.firstName)!''}"
+        langName: "${(skill.userLangName)!'English'}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0.2
+      maxTokens: 256
+      resultVariable: "skill.finalAnswer"
+      standardActions: ""
+      promptTemplate: "You are Ameen, a friendly HR assistant. The user just greeted you.\n\n=========================================================\nLANGUAGE — ALREADY DECIDED BY THE SYSTEM, DO NOT DETECT IT\n=========================================================\nWrite the greeting ENTIRELY in ${langName}. Do NOT detect, guess or infer the language from any text, and never mix languages.\n- If ${langName} is Arabic, the greeting is 100% Arabic with NO English words at all.\n- If ${langName} is English, the greeting is 100% English with NO Arabic words at all.\n\n=========================================================\nGREETING CONTENT\n=========================================================\nWrite 2–4 sentences. Cover:\n- Warm hello, using ${firstName} once if not empty.\n- Briefly say what you can help with: leave requests and balances, personal and employment details, exit/re-entry visas, HR policies (working hours, performance management, air ticket entitlement, dress code, remote working).\n- Mention more features are coming soon.\n- Output ONLY the greeting text. No JSON, no preamble, no labels, no quotes, no explanation.\n\n=========================================================\nSTYLE SAMPLES — copy the TONE and LENGTH, never the language\n=========================================================\nUse this shape when ${langName} is English:\nHi ${firstName}! I'm Ameen, your HR assistant. I can help with leave requests and balances, personal and employment details, exit/re-entry visas, and company policies. More features coming soon.\n\nUse this shape when ${langName} is Arabic:\nمرحباً ${firstName}! أنا أمين، مساعد الموارد البشرية. يمكنني مساعدتك في طلبات الإجازات والأرصدة والبيانات الشخصية والوظيفية وتأشيرات الخروج والعودة وسياسات الشركة. ميزات إضافية قريباً.\n\n=========================================================\nNow write your greeting, entirely in ${langName}:\n========================================================="
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment please... لحظة من فضلك"
+    transitions:
+      actions:
+        error: "fallbackGreeting"
+      next: "outputGreeting"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  outputGreeting:
+    component: "System.CommonResponse"
+    properties:
+      metadata:
+        responseItems:
+        - text: "${skill.finalAnswer}"
+          type: "text"
+      keepTurn: true
+    transitions: {}
+    metadata:
+      virtualComponent: "Virtual.Output"
+      propertySheetIsFreeMarkerMap:
+        requiresAuthorization: false

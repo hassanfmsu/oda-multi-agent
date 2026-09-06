@@ -1,0 +1,275 @@
+name: "System.MainFlow"
+trackingId: "AAAA0001-0000-0000-0000-000000000001"
+type: "main"
+version: "2.0"
+public: false
+interface: {}
+configuration:
+  requiresAuthorization: false
+variables:
+- name: "system.nlpresult"
+  type: "nlpresult"
+  description: "Variable used to store the nlp result from the intent component"
+  system: true
+- name: "system.intent.utterance"
+  type: "string"
+  description: "Used to override last user message for intent matching"
+  system: true
+- name: "system.event"
+  type: "map"
+  description: "Holds event properties"
+  system: true
+- name: "system.rb"
+  type: "resourcebundle"
+  description: "Resource bundle access"
+  system: true
+- name: "debug"
+  type: "string"
+  defaultValue: "Off"
+  description: "Toggle to On to see internal supervisor reasoning steps"
+  metadata:
+    isFreeMarker: true
+  trackingId: "BBBB0001-0000-0000-0000-000000000001"
+  system: false
+- name: "toolsLoop"
+  type: "int"
+  defaultValue: 0
+  description: "Counter for the supervisor loop iterations"
+  metadata:
+    isFreeMarker: false
+  trackingId: "BBBB0002-0000-0000-0000-000000000002"
+  system: false
+- name: "toolsHistory"
+  type: "string"
+  defaultValue: "\n"
+  description: "Accumulated history of tool calls and results within one user turn"
+  metadata:
+    isFreeMarker: true
+  trackingId: "BBBB0003-0000-0000-0000-000000000003"
+  system: false
+- name: "questionAnswerHistory"
+  type: "string"
+  defaultValue: " "
+  description: "Cross-turn question/answer memory (truncated to last few turns)"
+  metadata:
+    isFreeMarker: true
+  trackingId: "BBBB0004-0000-0000-0000-000000000004"
+  system: false
+- name: "parameterResponse"
+  type: "string"
+  description: "Captured user reply when supervisor asks for a missing parameter"
+  metadata:
+    isFreeMarker: true
+  trackingId: "BBBB0005-0000-0000-0000-000000000005"
+  system: false
+- name: "userQuestion"
+  type: "string"
+  description: "The raw original user message (in user's language)"
+  metadata:
+    isFreeMarker: true
+  trackingId: "BBBB0007-0000-0000-0000-000000000007"
+  system: false
+- name: "userLang"
+  type: "string"
+  defaultValue: "en"
+  description: "Single source of truth for the conversation language, as an ISO 639-1 code (ar, en, fr, ur, ...). Detected by the LLM once per turn in loopFlow.detectUserLang. Agents must never re-detect it."
+  metadata:
+    isFreeMarker: true
+  trackingId: "BBBB0008-0000-0000-0000-000000000008"
+  system: false
+- name: "userLangName"
+  type: "string"
+  defaultValue: "English"
+  description: "Human-readable name of userLang ('Arabic', 'English', 'French', ...). Injected into every message-writing prompt so the model is told the language instead of re-detecting it. Set in loopFlow.resolveUserLangName."
+  metadata:
+    isFreeMarker: true
+  trackingId: "BBBB0031-0000-0000-0000-000000000031"
+  system: false
+- name: "renderedMsg"
+  type: "string"
+  description: "Holds a fixed message: set in English, then overwritten by its *Render LLM state with the same message written in userLangName. Consumed immediately by the matching *Out / question state."
+  metadata:
+    isFreeMarker: true
+  trackingId: "BBBB0033-0000-0000-0000-000000000033"
+  system: false
+- name: "langProbe"
+  type: "string"
+  description: "Raw two-letter code returned by loopFlow.detectUserLang before validation. Internal - read only by loopFlow.normalizeUserLang."
+  metadata:
+    isFreeMarker: true
+  trackingId: "BBBB0032-0000-0000-0000-000000000032"
+  system: false
+- name: "modality"
+  type: "string"
+  defaultValue: "text"
+  description: "How the reply will reach the employee: 'voice' when it will be spoken aloud, otherwise 'text'. Set once per turn in loopFlow.setModality."
+  metadata:
+    isFreeMarker: true
+  trackingId: "BBBB0030-0000-0000-0000-000000000030"
+  system: false
+- name: "restResp"
+  type: "map"
+  description: "Generic REST response holder"
+  metadata:
+    isFreeMarker: false
+  trackingId: "BBBB0009-0000-0000-0000-000000000009"
+  system: false
+- name: "llmResp"
+  type: "string"
+  description: "Generic LLM response holder"
+  metadata:
+    isFreeMarker: true
+  trackingId: "BBBB000A-0000-0000-0000-00000000000A"
+  system: false
+- name: "sessionID"
+  type: "map"
+  description: "OCI Generative AI Agent session ID for RAG"
+  metadata:
+    isFreeMarker: false
+  trackingId: "BBBB000B-0000-0000-0000-00000000000B"
+  system: false
+- name: "attachmentURL"
+  type: "string"
+  description: "URL of last uploaded attachment (used for sick leave certificates)"
+  metadata:
+    isFreeMarker: true
+  trackingId: "BBBB000C-0000-0000-0000-00000000000C"
+  system: false
+- name: "finalAnswer"
+  type: "string"
+  description: "The final composed answer before language translation"
+  metadata:
+    isFreeMarker: true
+  trackingId: "BBBB000D-0000-0000-0000-00000000000D"
+  system: false
+- name: "filled_absenceType"
+  type: "string"
+  description: "Tracks if absenceType has been filled this turn"
+  metadata:
+    isFreeMarker: false
+  trackingId: "BBBB0010-0000-0000-0000-000000000010"
+  system: false
+- name: "filled_startDate"
+  type: "string"
+  description: "Tracks if startDate has been filled this turn"
+  metadata:
+    isFreeMarker: false
+  trackingId: "BBBB0011-0000-0000-0000-000000000011"
+  system: false
+- name: "filled_endDate"
+  type: "string"
+  description: "Tracks if endDate has been filled this turn"
+  metadata:
+    isFreeMarker: false
+  trackingId: "BBBB0012-0000-0000-0000-000000000012"
+  system: false
+- name: "filled_period"
+  type: "string"
+  description: "Tracks if period has been filled this turn"
+  metadata:
+    isFreeMarker: false
+  trackingId: "BBBB0013-0000-0000-0000-000000000013"
+  system: false
+- name: "filled_reason"
+  type: "string"
+  description: "Tracks if reason has been filled this turn"
+  metadata:
+    isFreeMarker: false
+  trackingId: "BBBB0014-0000-0000-0000-000000000014"
+  system: false
+- name: "filled_visaType"
+  type: "string"
+  description: "Tracks if visaType has been filled this turn"
+  metadata:
+    isFreeMarker: false
+  trackingId: "BBBB0015-0000-0000-0000-000000000015"
+  system: false
+- name: "filled_validaty"
+  type: "string"
+  description: "Tracks if validaty has been filled this turn"
+  metadata:
+    isFreeMarker: false
+  trackingId: "BBBB0016-0000-0000-0000-000000000016"
+  system: false
+- name: "filled_toDate"
+  type: "string"
+  description: "Tracks if toDate has been filled this turn"
+  metadata:
+    isFreeMarker: false
+  trackingId: "BBBB0017-0000-0000-0000-000000000017"
+  system: false
+- name: "filled_periodDays"
+  type: "string"
+  description: "Tracks if periodDays has been filled this turn"
+  metadata:
+    isFreeMarker: false
+  trackingId: "BBBB0018-0000-0000-0000-000000000018"
+  system: false
+- name: "filled_traficViolation"
+  type: "string"
+  metadata:
+    isFreeMarker: false
+  trackingId: "BBBB0019-0000-0000-0000-000000000019"
+  system: false
+- name: "filled_paidFee"
+  type: "string"
+  metadata:
+    isFreeMarker: false
+  trackingId: "BBBB001A-0000-0000-0000-00000000001A"
+  system: false
+- name: "filled_floats"
+  type: "string"
+  metadata:
+    isFreeMarker: false
+  trackingId: "BBBB001B-0000-0000-0000-00000000001B"
+  system: false
+- name: "filled_activeVisa"
+  type: "string"
+  metadata:
+    isFreeMarker: false
+  trackingId: "BBBB001C-0000-0000-0000-00000000001C"
+  system: false
+- name: "filled_iqamaExpiry"
+  type: "string"
+  metadata:
+    isFreeMarker: false
+  trackingId: "BBBB001D-0000-0000-0000-00000000001D"
+  system: false
+- name: "filled_confirmation"
+  type: "string"
+  metadata:
+    isFreeMarker: false
+  trackingId: "BBBB001E-0000-0000-0000-00000000001E"
+  system: false
+- name: "preExtractResponse"
+  type: "string"
+  description: ""
+  metadata:
+    isFreeMarker: true
+  trackingId: "18ad3c08-6268-4269-8de4-66b5d8966292"
+  system: false
+- name: "autoConfirmSummary"
+  type: "string"
+  description: ""
+  metadata:
+    isFreeMarker: true
+  trackingId: "f398d72f-deb1-47be-959e-5b0161d35c3b"
+  system: false
+- name: "question"
+  type: "string"
+  description: ""
+  metadata:
+    isFreeMarker: true
+  trackingId: "0d1abc42-08b0-46e2-89c7-57cf0a2f5898"
+  system: false
+eventMappings:
+- eventName: "system.intent.unresolvedIntent"
+  flowName: "loopFlow"
+  inputParameters:
+  - name: "lastToolResult"
+    value: "none"
+    required: false
+  - name: "lastTool"
+    value: "init"
+    required: false
+  trackingId: "CCCC0001-0000-0000-0000-000000000001"

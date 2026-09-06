@@ -1,0 +1,532 @@
+name: "absenceAgent"
+trackingId: "AAAA0012-0000-0000-0000-000000000012"
+type: "task"
+version: "2.0"
+interface: {}
+configuration:
+  requiresAuthorization: false
+  defaultApplicationContext: false
+  privateThread: false
+variables:
+- name: "rangeLLMResponse"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "startDate"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "endDate"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "rangeStatus"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "now"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+defaultTransitions:
+  actions:
+    system.startTaskFlow: "resetVariables"
+states:
+  resetVariables:
+    component: "System.ResetVariables"
+    properties:
+      variableList: "rangeLLMResponse,startDate,endDate,rangeStatus,now"
+    transitions:
+      next: "setnow"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variableList: false
+        requiresAuthorization: false
+  setnow:
+    component: "System.SetVariable"
+    properties:
+      variable: "now"
+      value: "${.now?string('yyyy-MM-dd')}"
+    transitions:
+      next: "invokeRangeLLM"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  invokeRangeLLM:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: true
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: true
+      promptTemplateParameters:
+        question: "${((skill.question)!'')?replace('<not set>','')}"
+        origMsg: "${(skill.userQuestion)!''}"
+        langName: "${(skill.userLangName)!'English'}"
+        startDate: "${((startDate)!'')?replace('<not set>','')}"
+        endDate: "${((endDate)!'')?replace('<not set>','')}"
+        now: "${now}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0
+      maxTokens: 256
+      resultVariable: "rangeLLMResponse"
+      standardActions: ""
+      promptTemplate: "You are helping an employee retrieve their ABSENCE / LEAVE history for a date range.\n\nToday's date is ${now}.\n\n============================\nLANGUAGE — ALREADY DECIDED BY THE SYSTEM, DO NOT DETECT IT\n============================\nWrite every \"message\" ENTIRELY in ${langName}, on every turn. Do NOT detect, guess or switch the language, and do NOT infer it from any text below — the examples and the memory contain both Arabic and English, and none of that affects your output. If ${langName} is Arabic every \"message\" is 100% Arabic; if ${langName} is English every \"message\" is 100% English. Never copy example text verbatim — express the idea in ${langName}. All JSON keys and status values are ALWAYS English.\n\n============================\nORIGINAL REQUEST (context only — NOT a language signal)\n============================\n${origMsg}\n\n============================\nCURRENT COLLECTED VALUES\n============================\n- startDate: ${startDate}\n- endDate: ${endDate}\n\n============================\nEMPLOYEE JUST SAID (latest input)\n============================\n${question}\n\n============================\nYOUR JOB\n============================\nDetermine the DATE RANGE (startDate and endDate, both YYYY-MM-DD) for the absence/leave history the employee wants.\n\nRULES:\n- The employee MUST specify a period. If they ask for their absence/leave history WITHOUT naming any period → output status incomplete with a message asking for the period. NEVER assume or default a period yourself.\n- A month name alone (\"december\", \"ديسمبر\"): if it is the CURRENT month → 1st of the month to today. If a past month this year → full month. If that month has not started yet this year → same month of the PREVIOUS year (full month).\n- \"last month\" / \"الشهر الماضي\" → full previous calendar month.\n- \"last N months\" / \"past N months\" / \"اخر N شهور\" / \"آخر N أشهر\" → startDate = today minus N months, endDate = today. Same for \"last N weeks\" (today minus N*7 days) and \"last N days\".\n- \"this year\" / \"هذه السنة\" → January 1st of this year to today. \"from the beginning of the year\" / \"من بداية السنة\" → same.\n- \"last year\" / \"السنة الماضية\" → January 1st to December 31st of the previous year.\n- \"from X to Y\" → the given range. If only a start is given (\"since december\") → endDate = today.\n- Accept English and Arabic month names and numeric forms (\"12/2025\").\n- endDate must never be after today — cap it at today.\n- Keep previously collected values unless the employee changes them.\n\n============================\nSTATUS\n============================\nCASE A — range determined:\n{\"status\":\"complete\",\"startDate\":\"YYYY-MM-DD\",\"endDate\":\"YYYY-MM-DD\"}\nNo \"message\" field. Do NOT ask for confirmation.\n\nCASE B — no period mentioned, or the period is unclear:\n{\"status\":\"incomplete\",\"startDate\":\"\",\"endDate\":\"\",\"message\":\"<ONE short friendly question, written in ${langName}, asking for which period they want their absence history, e.g. a month, this year, last year, or a date range>\"}\n\nCASE C — the employee wants to CANCEL (\"cancel\", \"stop\", \"never mind\", \"الغاء\", \"إلغاء\", \"لا اريد\", \"خلاص\"):\n{\"status\":\"cancel\",\"startDate\":\"\",\"endDate\":\"\"}\n\nCASE D — the employee's LATEST input is a DIFFERENT request entirely — not a period and not about this absence history: a greeting (hello, مرحبا), leave balance, payslip, submitting a new leave, attendance, a policy question, personal/employment info, or anything else off-topic:\n{\"status\":\"offtopic\",\"startDate\":\"\",\"endDate\":\"\"}\nIMPORTANT: a message that repeats the SAME absence-history request but still without a period (e.g. \"my absence history\", \"سجل اجازاتي\") is CASE B (ask again), NOT offtopic.\n\n============================\nEXAMPLES (assume today = 2026-07-15)\n============================\n\"show my absence history\" → {\"status\":\"incomplete\",\"startDate\":\"\",\"endDate\":\"\",\"message\":\"Sure — for which period would you like your absence history? You can say a month, this year, last year, or a date range.\"}\n\"my leave history for this year\" → {\"status\":\"complete\",\"startDate\":\"2026-01-01\",\"endDate\":\"2026-07-15\"}\n\"my absences last month\" → {\"status\":\"complete\",\"startDate\":\"2026-06-01\",\"endDate\":\"2026-06-30\"}\n\"absences from january to march\" → {\"status\":\"complete\",\"startDate\":\"2026-01-01\",\"endDate\":\"2026-03-31\"}\n\"my leaves in the last 3 months\" → {\"status\":\"complete\",\"startDate\":\"2026-04-15\",\"endDate\":\"2026-07-15\"}\n\"اعرض لي اجازاتي في اخر 3 شهور\" → {\"status\":\"complete\",\"startDate\":\"2026-04-15\",\"endDate\":\"2026-07-15\"}\n\"i want to see my leave history from the beginning of the year\" → {\"status\":\"complete\",\"startDate\":\"2026-01-01\",\"endDate\":\"2026-07-15\"}\n\"سجل اجازاتي\" → {\"status\":\"incomplete\",\"startDate\":\"\",\"endDate\":\"\",\"message\":\"أكيد — لأي فترة تريد سجل الإجازات؟ يمكنك قول شهر معين، هذه السنة، السنة الماضية، أو فترة محددة.\"}\n\"اجازاتي هذه السنة\" → {\"status\":\"complete\",\"startDate\":\"2026-01-01\",\"endDate\":\"2026-07-15\"}\n\"cancel\" → {\"status\":\"cancel\",\"startDate\":\"\",\"endDate\":\"\"}\n\"الغاء\" → {\"status\":\"cancel\",\"startDate\":\"\",\"endDate\":\"\"}\n\"hello\" → {\"status\":\"offtopic\",\"startDate\":\"\",\"endDate\":\"\"}\n\"what is my leave balance\" → {\"status\":\"offtopic\",\"startDate\":\"\",\"endDate\":\"\"}\n\"i want to submit annual leave\" → {\"status\":\"offtopic\",\"startDate\":\"\",\"endDate\":\"\"}\n\n============================\nRULES\n============================\n- Respond with JSON ONLY. No text before or after.\n- ALWAYS output all three fields: status, startDate, endDate (use \"\" when unknown). status is one of: complete, incomplete, cancel, offtopic.\n- The \"message\" field must be written in ${langName}."
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment, please..."
+    transitions:
+      next: "cleanRangeJson"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        outOfScopeKeyword: false
+        enableStreaming: false
+        userPrompt: true
+        outOfScopeMessage: true
+        enableMultiTurn: false
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        promptTemplate: true
+        eventHandler: false
+        retryUserMessage: true
+        llmService: false
+  cleanRangeJson:
+    component: "System.SetVariable"
+    properties:
+      variable: "rangeLLMResponse"
+      value: "${\"{\" + (rangeLLMResponse?keep_after(\"{\"))?keep_before_last(\"}\") + \"}\"}"
+    transitions:
+      next: "setStartDate"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  setStartDate:
+    component: "System.SetVariable"
+    properties:
+      variable: "startDate"
+      value: "${((rangeLLMResponse?eval_json.startDate)!(startDate!''))?replace('<not set>','')}"
+    transitions:
+      next: "setEndDate"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  setEndDate:
+    component: "System.SetVariable"
+    properties:
+      variable: "endDate"
+      value: "${((rangeLLMResponse?eval_json.endDate)!(endDate!''))?replace('<not set>','')}"
+    transitions:
+      next: "setRangeStatus"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  setRangeStatus:
+    component: "System.SetVariable"
+    properties:
+      variable: "rangeStatus"
+      value: "${(rangeLLMResponse?eval_json.status)!'incomplete'}"
+    transitions:
+      next: "switchRangeStatus"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  switchRangeStatus:
+    component: "System.Switch"
+    properties:
+      variable: "rangeStatus"
+    transitions:
+      actions:
+        incomplete: "clearQuestion"
+        complete: "callAbsenceAPI"
+        cancel: "presentCancelled"
+        offtopic: "rerouteToLoop"
+      next: "clearQuestion"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        source: true
+        requiresAuthorization: false
+  presentCancelled:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        langName: "${(skill.userLangName)!'English'}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0.2
+      maxTokens: 128
+      resultVariable: "skill.finalAnswer"
+      standardActions: ""
+      promptTemplate: "Write ONE short, polite message confirming that the absence-history request has been cancelled and that you are happy to help with anything else.\n\nLANGUAGE — write the message ENTIRELY in ${langName}. The language is already decided by the system: do NOT detect it, guess it, or mix languages.\n\nOutput ONLY the message text, no quotes, no labels."
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment please... لحظة من فضلك"
+    transitions:
+      actions:
+        error: "presenterFallback"
+      next: "outputDirect"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  rerouteToLoop:
+    component: "System.InvokeFlow"
+    properties:
+      inputParameters:
+      - name: "lastTool"
+        value: "init"
+      - name: "lastToolResult"
+        value: "none"
+      flow: "loopFlow"
+      outputParameters: []
+    transitions: {}
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        flow: false
+  clearQuestion:
+    component: "System.ResetVariables"
+    properties:
+      variableList: "skill.question"
+    transitions:
+      next: "question"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variableList: false
+        requiresAuthorization: false
+  question:
+    component: "System.CommonResponse"
+    properties:
+      variable: "skill.question"
+      processUserMessage: true
+      prompt: "${(rangeLLMResponse?eval_json.message)!((((skill.userLang)!'en') == 'ar')?then('لأي فترة تريد سجل الإجازات؟','For which period would you like your absence history?'))}"
+    transitions:
+      next: "invokeRangeLLM"
+    metadata:
+      virtualComponent: "Virtual.Question"
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        prompt: true
+        requiresAuthorization: false
+  callAbsenceAPI:
+    component: "System.CallRestService"
+    properties:
+      authConfigType: "basicAuth"
+      restService: "AbsanceHistory"
+      endpoint: "https://aljent-oic-jed-prod01-lrwl7ouc1vb3-je.integration.me-jeddah-1.ocp.oraclecloud.com/ic/api/integration/v1/flows/rest/EMP_LEAVE_HIST_INT_API/1.0/getEmpLeaves"
+      responseConfig: "apiResponse"
+      requestHeaders: []
+      method: "GET"
+      requestParameters:
+      - type: "query"
+        value: "${(profile.properties.value.personId)!''}"
+        key: "PersonID"
+      - type: "query"
+        value: "${(profile.email)!''}"
+        key: "email"
+      - type: "query"
+        value: "${startDate}"
+        key: "StartDate"
+      - type: "query"
+        value: "${endDate}"
+        key: "EndDate"
+      resultVariable: "skill.restResp"
+    transitions:
+      actions:
+        error: "presentServiceError"
+      next: "checkAnswered"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        authConfigType: false
+        requestParameters--Item--type: false
+        restService: false
+        endpoint: false
+        responseConfig: false
+        method: false
+        requestBody: false
+        apiKeyValueVariable: false
+        passwordVariable: false
+        tokenVariable: false
+        resultVariable: false
+        requiresAuthorization: false
+  checkAnswered:
+    component: "System.Switch"
+    properties:
+      source: "${((skill.restResp.value.statusCode!0)?number == 200)?then('OK','BAD')}"
+    transitions:
+      actions:
+        OK: "presentAbsences"
+        BAD: "presentNoData"
+      next: "presentNoData"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        source: true
+        requiresAuthorization: false
+  presentAbsences:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: true
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        langName: "${(skill.userLangName)!'English'}"
+        fromDate: "${(startDate)!''}"
+        toDate: "${(endDate)!''}"
+        absenceJson: "${(skill.restResp?string)!''}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0.2
+      maxTokens: 1024
+      resultVariable: "skill.finalAnswer"
+      standardActions: ""
+      promptTemplate: "You are Ameen, an HR assistant. Present the employee's ABSENCE / LEAVE history as a clean table using ONLY the data in the JSON below.\n\nLANGUAGE — ALREADY DECIDED BY THE SYSTEM, DO NOT DETECT IT:\nWrite the ENTIRE message in ${langName}. Do NOT detect or guess the language from any text, and never mix languages.\n\nRequested period: ${fromDate} to ${toDate}\n\nRAW ABSENCE SERVICE RESPONSE (JSON):\n${absenceJson}\n\nINSTRUCTIONS:\n- Find the absence/leave records inside the JSON (ignore technical wrapper fields like statusCode, headers).\n- FORMAT — GROUPED BY MONTH, most recent month first, most recent absence first inside each month:\nLine 1: 🗓️ <N> <absences-word> · <short period, e.g. Apr 1 → Jul 20, 2026>\n(blank line)\n<Month Year>            ← month header line, e.g. \"July 2026\" (Arabic: \"يوليو 2026\")\n<status emoji> <leave type> · <days> <day-word> · <short date>\n...more rows of that month...\n(blank line)\n<next Month Year>\n...\n- ROW SHAPE (exactly this order): status emoji, leave type, days, then the SHORT date:\n✅ Annual Leave · 5 days · May 17–21\n⏳ Hours Leave · 0.5 day · Jul 20\n❌ Sick Leave · 1 day · Jul 2\n- SHORT DATES: never repeat the year or the full ISO date in rows — the month header carries month+year. Single day → \"Jul 20\" (Arabic: \"20 يوليو\"). Range inside the same month → \"May 17–21\". Range crossing months → \"Apr 28 → May 2\" (place the row under the START month).\n- GROUPING ACCURACY — CRITICAL, verify before writing each row:\n  * A row goes under the month header of its START date. A June date must NEVER appear under \"July\", a February date must NEVER appear under \"March\". Re-read each record's start date and match it to the header before writing the row.\n  * Every record from the JSON appears EXACTLY ONCE — never repeat a record under two months, never drop a record. The row count across all months must equal the count in your intro line.\n  * Inside each month, sort rows by start date, most recent first.\n- DAYS: 0.5 → \"0.5 day\" (Arabic: \"نصف يوم\"), 1 → \"1 day\" (Arabic: \"يوم واحد\"), N → \"N days\" (Arabic: \"N أيام\"). Use the number from the JSON — never calculate.\n- Type emojis: 🏖️ annual, 🤒 sick, ⏱️ hours/permission, 🕌 hajj, 💍 marriage, ⚰️ death, 📝 examination, 🏠 remote working, 👶 birth, 🆘 emergency, 📌 anything else.\n- Status emojis (NO status word in rows — the emoji is the status): ✅ approved, ⏳ pending/in progress/awaiting, ❌ withdrawn/rejected/cancelled. Never show raw codes like ORA_WITHDRAWN anywhere.\n- THE ENTIRE MESSAGE MUST BE IN ${langName} — intro line, month headers, leave types, day words, everything. English → English month names and leave types. Arabic → Arabic month names (يناير فبراير مارس أبريل مايو يونيو يوليو أغسطس سبتمبر أكتوبر نوفمبر ديسمبر) and Arabic leave types (إجازة سنوية، إجازة مرضية، إذن ساعات، عمل عن بعد). NEVER mix languages in one message.\n- Keep all numbers EXACTLY as in the JSON — never calculate or invent values.\n- If the JSON contains NO absence records for the period, politely say no absences were found for that period — that may simply mean they did not take any leave — and suggest another period.\n- Output ONLY the message text — no JSON, no code fences, no asterisks or markdown, no header row, no technical field names or raw status codes, no URLs."
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment please... لحظة من فضلك"
+    transitions:
+      actions:
+        error: "presenterFallback"
+      next: "outputDirect"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  presentNoData:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        langName: "${(skill.userLangName)!'English'}"
+        fromDate: "${(startDate)!''}"
+        toDate: "${(endDate)!''}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0.2
+      maxTokens: 160
+      resultVariable: "skill.finalAnswer"
+      standardActions: ""
+      promptTemplate: "Write ONE short, polite message telling the employee that no absence records were found for the period ${fromDate} to ${toDate} — which may simply mean they did not take any leave in that period — and suggesting they can try another period.\n\nLANGUAGE — write the message ENTIRELY in ${langName}. The language is already decided by the system: do NOT detect it, guess it, or mix languages.\n\nOutput ONLY the message text, no quotes, no labels."
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment please... لحظة من فضلك"
+    transitions:
+      actions:
+        error: "presenterFallback"
+      next: "outputDirect"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  presentServiceError:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        langName: "${(skill.userLangName)!'English'}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0.2
+      maxTokens: 128
+      resultVariable: "skill.finalAnswer"
+      standardActions: ""
+      promptTemplate: "Write ONE short, polite message telling the employee that the absence history service is temporarily unavailable and to please try again in a little while.\n\nLANGUAGE — write the message ENTIRELY in ${langName}. The language is already decided by the system: do NOT detect it, guess it, or mix languages.\n\nOutput ONLY the message text, no quotes, no labels."
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment please... لحظة من فضلك"
+    transitions:
+      actions:
+        error: "presenterFallback"
+      next: "outputDirect"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  presenterFallback:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.finalAnswer"
+      value: "I could not retrieve your absence history right now. Please try again in a moment.\n\nلم أتمكن من جلب سجل الإجازات حالياً. يرجى المحاولة مرة أخرى بعد قليل."
+    transitions:
+      next: "outputDirect"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  outputDirect:
+    component: "System.CommonResponse"
+    properties:
+      metadata:
+        responseItems:
+        - text: "${skill.finalAnswer}"
+          type: "text"
+      keepTurn: true
+    transitions:
+      next: "appendHistory"
+    metadata:
+      virtualComponent: "Virtual.Output"
+      propertySheetIsFreeMarkerMap:
+        requiresAuthorization: false
+  appendHistory:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.questionAnswerHistory"
+      value: "${(skill.questionAnswerHistory)!''}\n\n### Question\n${(skill.userQuestion)!''}\n### Answer\n${skill.finalAnswer}"
+    transitions: {}
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false

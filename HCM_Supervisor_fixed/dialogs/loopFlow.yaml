@@ -1,0 +1,740 @@
+name: "loopFlow"
+trackingId: "AAAA0002-0000-0000-0000-000000000002"
+type: "task"
+version: "2.0"
+interface:
+  inputParameters:
+  - name: "lastToolResult"
+    description: "Result text from the most recent tool call"
+    type: "string"
+    required: true
+    defaultValue: "none"
+    metadata:
+      isFreeMarker: true
+    trackingId: "DDDD0001-0000-0000-0000-000000000001"
+  - name: "lastTool"
+    description: "Name of the most recent tool, or 'init' on first entry"
+    type: "string"
+    required: true
+    metadata:
+      isFreeMarker: true
+    trackingId: "DDDD0002-0000-0000-0000-000000000002"
+  returnActions:
+  - "done"
+configuration:
+  requiresAuthorization: false
+  defaultApplicationContext: false
+  privateThread: false
+defaultTransitions:
+  actions:
+    system.startTaskFlow: "switchInit"
+states:
+  endFlow:
+    component: "System.EndFlow"
+    properties:
+      action: "done"
+    transitions: {}
+    metadata: {}
+  checkLoopMax:
+    component: "System.Switch"
+    properties:
+      source: "${(skill.toolsLoop?number<10)?then('continue','stop')}"
+    transitions:
+      actions:
+        stop: "outputLoopMax"
+        continue: "checkAutoComplete"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        source: true
+        requiresAuthorization: false
+  checkAutoComplete:
+    component: "System.Switch"
+    properties:
+      source: "ASK"
+    transitions:
+      actions:
+        AUTO: "gateSickAttachment"
+        ASK: "invokeSupervisor"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        source: true
+        requiresAuthorization: false
+  gateSickAttachment:
+    component: "System.Switch"
+    properties:
+      source: "${((skill.filled_absenceType!'')?lower_case?contains('sick'))?then(((skill.attachmentURL!'')?trim?length gt 0)?then('PROCEED','NEEDATT'),'PROCEED')}"
+    transitions:
+      actions:
+        NEEDATT: "invokeSupervisor"
+        PROCEED: "buildAutoSummary"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        source: true
+        requiresAuthorization: false
+  buildAutoSummary:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.autoConfirmSummary"
+      value: "${skill.filled_absenceType}<#if (skill.filled_startDate)?? && (skill.filled_endDate)??><#if skill.filled_startDate == skill.filled_endDate> on ${skill.filled_startDate}<#else> from ${skill.filled_startDate} to ${skill.filled_endDate}</#if></#if><#if (skill.filled_period!'')?length gt 0> (${skill.filled_period})</#if><#if (skill.filled_reason!'')?length gt 0> — reason: ${skill.filled_reason}</#if>. Submit?"
+    transitions:
+      next: "invokeAutoConfirmFlow"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  invokeAutoConfirmFlow:
+    component: "System.InvokeFlow"
+    properties:
+      inputParameters: []
+      flow: "confirmFlow"
+      outputParameters: []
+    transitions: {}
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        flow: false
+  fallbackQuestion:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.question"
+      value: "${skill.userQuestion}"
+    transitions:
+      next: "preExtractLLM"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  applyExtractedAbsenceType:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.filled_absenceType"
+      value: "${((skill.preExtractResponse!'{}')?eval_json.absenceType)!''}"
+    transitions:
+      next: "applyExtractedStartDate"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  invokeSupervisor:
+    component: "System.InvokeFlow"
+    properties:
+      inputParameters: []
+      flow: "supervisorFlow"
+      outputParameters: []
+    transitions: {}
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        flow: false
+  outputDebug:
+    component: "System.CommonResponse"
+    properties:
+      metadata:
+        responseItems:
+        - text: "[debug ${skill.toolsLoop}] tool=${lastTool}\n${lastToolResult}"
+          type: "text"
+      keepTurn: true
+    transitions:
+      next: "checkLoopMax"
+    metadata:
+      virtualComponent: "Virtual.Output"
+      propertySheetIsFreeMarkerMap:
+        requiresAuthorization: false
+  applyExtractedPeriod:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.filled_period"
+      value: "${((skill.preExtractResponse!'{}')?eval_json.period)!''}"
+    transitions:
+      next: "applyExtractedReason"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  cleanExtractedJson:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.preExtractResponse"
+      value: "${'{' + (((skill.preExtractResponse!'{}'))?keep_after('{'))?keep_before_last('}') + '}'}"
+    transitions:
+      next: "applyExtractedAbsenceType"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  reformulateQuestion:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        questionAnswerHistory: "${skill.questionAnswerHistory}"
+        question: "${skill.userQuestion}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0
+      maxTokens: 256
+      resultVariable: "skill.question"
+      standardActions: ""
+      promptTemplate: "Rewrite the user's question into a clear, self-contained English question for an HR assistant.\n\nRules:\n- If there is no previous conversation, do NOT change the meaning. Just translate to English if needed and resolve obvious dialect.\n- If the user is following up on a previous topic (\"and what about my hire date\", \"yes do it\"), make the question self-contained using the history.\n- If the message is a REACTION to the assistant's previous answer rather than a new request (\"that is wrong\", \"are you sure\", \"why\", \"explain\", \"thanks\", \"هذا غلط\", \"متأكد\", \"ليش\"), KEEP it as a reaction — output it as a short sentence that clearly refers to the previous answer, e.g. \"The user says the leave balance I just gave (4.50 days) is wrong.\" NEVER rewrite a reaction into a fresh data or policy question.\n- Common Saudi Arabic mappings:\n  * \"بكره\"/\"باكر\" → \"tomorrow\"\n  * \"اليوم\" → \"today\"\n  * \"الأسبوع الجاي\"/\"الأسبوع القادم\" → \"next week\"\n  * \"إجازة سنوية\" → \"annual leave\"\n  * \"إجازة مرضية\" → \"sick leave\"\n  * \"إذن خروج\"/\"إذن ساعات\" → \"hours leave\"\n  * \"عمل عن بعد\" → \"remote working\"\n  * \"إجازة وضع\" → \"birth of new child\"\n  * \"إجازة وفاة\" → \"death vacation\"\n  * \"إجازة حج\" → \"hajj vacation\"\n  * \"إجازة اختبار\" → \"examination leave\"\n  * \"إجازة زواج\" → \"marriage vacation\"\n  * \"تأشيرة خروج وعودة\" → \"exit re-entry visa\"\n  * \"تأشيرة خروج نهائي\" → \"exit only visa\"\n  * \"رصيد\" → \"balance\"\n  * \"مديري\" → \"my manager\"\n  * \"راتبي\" → \"my salary\"\n- Output ONLY the rewritten question. No explanation. No quotes.\n\nPrevious conversation:\n${questionAnswerHistory}\n\nUser question:\n${question}\n\nRewritten:\n"
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment please... لحظة من فضلك"
+    transitions:
+      actions:
+        error: "fallbackQuestion"
+      next: "preExtractLLM"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  initToolsHistory:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.toolsHistory"
+      value: "none"
+    transitions:
+      next: "resetFilled"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: false
+        requiresAuthorization: false
+  validateInput:
+    component: "System.Switch"
+    properties:
+      source: "${((skill.userQuestion!'')?trim?length > 0)?then('OK','EMPTY')}"
+    transitions:
+      actions:
+        OK: "reformulateQuestion"
+        EMPTY: "outputEmptyInput"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        source: true
+        requiresAuthorization: false
+  forceOutputFromHistory:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.finalAnswer"
+      value: "${lastToolResult}"
+    transitions:
+      next: "outputForceFinal"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  switchDebug:
+    component: "System.Switch"
+    properties:
+      source: "${(skill.debug)!'Off'}"
+    transitions:
+      actions:
+        "On": "outputDebug"
+      next: "checkLoopMax"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        source: true
+        requiresAuthorization: false
+  applyExtractedReason:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.filled_reason"
+      value: "${((skill.preExtractResponse!'{}')?eval_json.reason)!''}"
+    transitions:
+      next: "invokeSupervisor"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  applyExtractedStartDate:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.filled_startDate"
+      value: "${((skill.preExtractResponse!'{}')?eval_json.startDate)!''}"
+    transitions:
+      next: "applyExtractedEndDate"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  appendHistory:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.toolsHistory"
+      value: "<#if skill.toolsHistory!=\"none\">${skill.toolsHistory}</#if>\n### ${skill.toolsLoop}. tool ${lastTool}\n${lastToolResult}"
+    transitions:
+      next: "switchDebug"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  switchInit:
+    component: "System.Switch"
+    properties:
+      variable: "lastTool"
+    transitions:
+      actions:
+        init: "initToolsLoop"
+      next: "incrementCounter"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        source: true
+        requiresAuthorization: false
+  incrementCounter:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.toolsLoop"
+      value: "${skill.toolsLoop?number+1}"
+    transitions:
+      next: "checkRepeatedTool"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  preExtractLLM:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: true
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: true
+      promptTemplateParameters:
+        today: "${.now?string('yyyy-MM-dd')}"
+        userQuestion: "${(skill.userQuestion)!''}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0
+      maxTokens: 512
+      resultVariable: "skill.preExtractResponse"
+      standardActions: "SUBMIT,CANCEL,UNDO"
+      promptTemplate: "You are a slot extraction assistant for an HR chatbot. Extract leave/visa SUBMISSION info ONLY when the user is asking to SUBMIT, REQUEST, APPLY for, BOOK, TAKE, or START a leave or visa. For ANY other intent (policy, balance, info, greeting, salary, personal/employment lookup), return all-empty.\n\nToday is: ${today}.\n\nUser said: \"${userQuestion}\"\n\n============================================================\nINTENT GATE — RUN THIS FIRST\n============================================================\nReturn {\"absenceType\":\"\",\"startDate\":\"\",\"endDate\":\"\",\"period\":\"\",\"reason\":\"\"} (all empty) if the user is doing ANY of the following — even if they mention a leave-type word:\n\n- POLICY / RULES / ELIGIBILITY questions:\n  \"what is the X policy\", \"X policy\", \"rules for X\", \"am I eligible\", \"how does X work\",\n  \"tell me about X\", \"can I X\", \"is X allowed\",\n  \"سياسة\", \"قواعد\", \"شروط\", \"يحق لي\"\n- BALANCE / DAYS questions:\n  \"what is my balance\", \"how many days\", \"remaining leave\", \"رصيدي\", \"كم يوم\"\n- PERSONAL / EMPLOYMENT INFO:\n  \"who is my manager\", \"my hire date\", \"my passport\", \"my position\", \"مديري\", \"تاريخ التعيين\"\n- SALARY / PAYSLIP:\n  \"my salary\", \"payslip\", \"راتبي\"\n- GREETINGS / SMALL TALK:\n  \"hi\", \"hello\", \"thanks\", \"who are you\", \"what can you do\"\n- Anything that is a QUESTION about HR rather than a REQUEST to submit something.\n\nOnly extract slots if the user is clearly SUBMITTING / REQUESTING / APPLYING / TAKING / BOOKING leave or a visa. Trigger phrases:\n- English: \"i want to/i'd like to/can i/i need to\" + \"submit/request/apply/take/book/get/use\" + leave-type; \"submit X leave\"; \"apply for X\"; \"request X\"; \"i want X for/on/tomorrow\"\n- Arabic: \"أريد إجازة\", \"اطلب إجازة\", \"بقدم إجازة\", \"اقدم طلب\", \"ابي إجازة\", \"محتاج إجازة\"\n\n============================================================\nEXTRACTION RULES (only if intent gate passed)\n============================================================\n\n1. **absenceType** — set to ONE of these EXACT values:\n   - \"Annual Leave\" (annual, vacation, سنوية)\n   - \"Sick Leave\" (sick, illness, مرضية)\n   - \"Hours Leave\" (hours, hour, permission, إذن خروج, ساعات)\n   - \"Emergency Leave\" (emergency, طارئة)\n   - \"Marriage Vacation\" (marriage, wedding, زواج)\n   - \"Hajj Vacation\" (hajj, حج)\n   - \"Death Vacation\" (death, bereavement, وفاة)\n   - \"Examination Leave\" (exam, examination, اختبار)\n   - \"Birth of New Child\" (birth, newborn, paternity, maternity, وضع)\n   - \"Remote Working\" (remote, work from home, عن بعد) — ONLY when user is REQUESTING to work remotely on dates, NOT when asking about the policy\n   If no leave type or gate failed, set to \"\".\n\n2. **startDate** — convert to YYYY-MM-DD using today=${today}.\n\n   ⚠️ CRITICAL: Output \"\" (empty string) if the user did NOT explicitly mention any date or time reference.\n   DO NOT default to today. DO NOT guess.\n   \n   IS a date reference: \"today\", \"tomorrow\", \"yesterday\", \"on Monday/Tuesday/etc\", \"next/last week\", \"next Sunday\", \"in N days\", \"May 7\", \"7 May\", \"5/7\", \"2026-05-07\", \"بكره\", \"اليوم\", \"غدا\", \"الأحد القادم\", \"بعد X أيام\", or any month name + day.\n   NOT a date reference: \"submit\", \"request\", \"want\", \"need\", \"please\", \"a leave\", \"permission leave\", \"اجازة\", \"اريد\", \"اطلب\".\n   \n   When a date IS mentioned:\n   - \"today\"/\"اليوم\" → today (${today})\n   - \"tomorrow\"/\"بكره\"/\"غدا\" → today+1\n   - \"next sunday/monday/etc\" → next occurrence of that weekday\n   - \"next week\" → next Monday\n   - \"in N days\" → today+N\n   - \"May 7\"/\"7 May\"/\"5/7\"/\"december 10\"/\"decemper 10\" (typo OK) → resolve with current year\n   - \"from X to Y\" → X (and endDate=Y)\n   Empty if no date.\n\n3. **endDate** — same rules. Special:\n   - Single-day phrases (\"tomorrow only\", \"may 7 only\", \"يوم واحد\") → endDate = startDate\n   - Hours Leave is ALWAYS single-day → endDate = startDate\n   - \"from X to Y\" → Y\n   - \"for N days starting X\" → X + N - 1\n   - \"next week\" → next Friday\n   Empty if not determinable (do NOT guess).\n\n4. **period** — Hours Leave only:\n   - morning/صباحا → \"Morning - صباحا\"\n   - evening/afternoon/مساء → \"Evening - مساء\"\n   Else \"\".\n\n5. **reason** — Sick Leave only, map to one of:\n   Arthritis, Contagious illness, Diarrhea, Flu, General Allergies, General Injuries, Headache, High Fever, Illness that negatively impacts productivity, Indigestion, Other, Sinusitis, Surgery, Torn ligament, Vomiting\n   Mappings: cold→Flu, stomach ache→Indigestion, صداع→Headache, حرارة→High Fever, استفراغ→Vomiting, حساسية→General Allergies, اسهال→Diarrhea, عملية→Surgery\n   Else \"\".\n\n============================================================\nOUTPUT FORMAT — strict JSON only\n============================================================\n{\"absenceType\":\"<value or empty>\",\"startDate\":\"<YYYY-MM-DD or empty>\",\"endDate\":\"<YYYY-MM-DD or empty>\",\"period\":\"<value or empty>\",\"reason\":\"<value or empty>\"}\n\n============================================================\nEXAMPLES\n============================================================\n\nUser: \"what is remote working policy\"\n→ {\"absenceType\":\"\",\"startDate\":\"\",\"endDate\":\"\",\"period\":\"\",\"reason\":\"\"}   ← POLICY question, gate fails\n\nUser: \"annual leave policy\"\n→ {\"absenceType\":\"\",\"startDate\":\"\",\"endDate\":\"\",\"period\":\"\",\"reason\":\"\"}   ← POLICY question\n\nUser: \"what is my balance\"\n→ {\"absenceType\":\"\",\"startDate\":\"\",\"endDate\":\"\",\"period\":\"\",\"reason\":\"\"}   ← BALANCE question\n\nUser: \"who is my manager\"\n→ {\"absenceType\":\"\",\"startDate\":\"\",\"endDate\":\"\",\"period\":\"\",\"reason\":\"\"}   ← lookup\n\nUser: \"hi\"\n→ {\"absenceType\":\"\",\"startDate\":\"\",\"endDate\":\"\",\"period\":\"\",\"reason\":\"\"}   ← greeting\n\nUser: \"can I take annual leave on weekends\"\n→ {\"absenceType\":\"\",\"startDate\":\"\",\"endDate\":\"\",\"period\":\"\",\"reason\":\"\"}   ← eligibility question, NOT a submission\n\nUser: \"i want to submit annual leave\"\n→ {\"absenceType\":\"Annual Leave\",\"startDate\":\"\",\"endDate\":\"\",\"period\":\"\",\"reason\":\"\"}\n\nUser: \"i want to submit hour leave next sunday morning\"\n→ {\"absenceType\":\"Hours Leave\",\"startDate\":\"<next sunday>\",\"endDate\":\"<same>\",\"period\":\"Morning - صباحا\",\"reason\":\"\"}\n\nUser: \"i want remote working tomorrow\"\n→ {\"absenceType\":\"Remote Working\",\"startDate\":\"<tomorrow>\",\"endDate\":\"<tomorrow>\",\"period\":\"\",\"reason\":\"\"}\n\nUser: \"sick leave tomorrow because of headache\"\n→ {\"absenceType\":\"Sick Leave\",\"startDate\":\"<tomorrow>\",\"endDate\":\"<tomorrow>\",\"period\":\"\",\"reason\":\"Headache\"}\n\nUser: \"annual leave from may 11 to 15\"\n→ {\"absenceType\":\"Annual Leave\",\"startDate\":\"<YYYY-05-11>\",\"endDate\":\"<YYYY-05-15>\",\"period\":\"\",\"reason\":\"\"}\n\nUser: \"اريد اجازة مرضية بكره بسبب صداع\"\n→ {\"absenceType\":\"Sick Leave\",\"startDate\":\"<tomorrow>\",\"endDate\":\"<tomorrow>\",\"period\":\"\",\"reason\":\"Headache\"}\n\nUser: \"ما هي سياسة العمل عن بعد\"\n→ {\"absenceType\":\"\",\"startDate\":\"\",\"endDate\":\"\",\"period\":\"\",\"reason\":\"\"}   ← Arabic policy question\n\n============================================================\n\n============================================================\nKEY NEGATIVE EXAMPLES (DO NOT GUESS DATES)\n============================================================\n\nUser: \"i want to submit permission leave\"\n→ {\"absenceType\":\"Hours Leave\",\"startDate\":\"\",\"endDate\":\"\",\"period\":\"\",\"reason\":\"\"}\n   ⚠️ No date mentioned. Both startDate and endDate MUST be empty.\n\nUser: \"i want annual leave\"\n→ {\"absenceType\":\"Annual Leave\",\"startDate\":\"\",\"endDate\":\"\",\"period\":\"\",\"reason\":\"\"}\n   ⚠️ No date mentioned.\n\nUser: \"i want hour leave on december 10\"\n→ {\"absenceType\":\"Hours Leave\",\"startDate\":\"2026-12-10\",\"endDate\":\"2026-12-10\",\"period\":\"\",\"reason\":\"\"}\n\nUser: \"decemper 10\" (typo)\n→ {\"absenceType\":\"\",\"startDate\":\"2026-12-10\",\"endDate\":\"2026-12-10\",\"period\":\"\",\"reason\":\"\"}\n\n============================================================\n\nRESPOND NOW WITH PURE JSON ONLY\nDo NOT wrap in code fences. Start with { and end with }\n============================================================"
+      undoButtonLabel: "Undo"
+      retryUserMessage: "..."
+    transitions:
+      actions:
+        error: "invokeSupervisor"
+      next: "cleanExtractedJson"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  checkRepeatedTool:
+    component: "System.Switch"
+    properties:
+      source: "${((skill.toolsHistory!'')?contains('tool ' + lastTool))?then((lastTool == 'parameter')?then('OK',(lastTool == 'attachment')?then('OK',(lastTool == 'confirm')?then('OK',(lastTool == 'supervisor_skip')?then('OK',(lastTool == 'supervisor_error')?then('OK','REPEAT'))))),'OK')}"
+    transitions:
+      actions:
+        REPEAT: "forceOutputFromHistory"
+        OK: "appendHistory"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        source: true
+        requiresAuthorization: false
+  captureUserQuestion:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.userQuestion"
+      value: "${(system.message.messagePayload.text)!''}"
+    transitions:
+      next: "detectUserLang"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  detectUserLang:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        userText: "${(skill.userQuestion)!''}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0
+      maxTokens: 8
+      resultVariable: "skill.langProbe"
+      standardActions: ""
+      promptTemplate: "Identify the language that the MESSAGE below is written in.\n\nRules:\n- Output ONLY the two-letter ISO 639-1 language code in lower case. Examples: en, ar, fr, es, hi, ur, de, zh.\n- Judge by the SCRIPT and WORDS of the MESSAGE itself. Ignore the topic, and ignore any name of a person, month, country or city.\n- If the MESSAGE is written with the Latin alphabet, output en. This applies even when the wording is informal, abbreviated, ALL CAPS, or contains spelling mistakes — \"I WANT SUBMIT LEAVE\", \"TOMMORW\", \"PM\", \"ok go\", \"decemper 10\" are all en.\n- If the MESSAGE is written in Arabic script, output ar.\n- If the MESSAGE mixes scripts, output the code of the script that most of the LETTERS belong to. On a tie, output en.\n- If the MESSAGE contains no letters at all (only digits, punctuation, emoji or an empty string), output exactly: xx\n- Output nothing except the two-letter code. No punctuation, no quotes, no explanation.\n\nMESSAGE\n${userText}\n\nCODE"
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment please... لحظة من فضلك"
+    transitions:
+      actions:
+        error: "keepPreviousUserLang"
+      next: "normalizeUserLang"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  normalizeUserLang:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.userLang"
+      value: "<#assign _c = ((skill.langProbe)!'')?trim?lower_case><#if _c?length gt 2><#assign _c = _c?substring(0,2)></#if>${(_c?matches('[a-z][a-z]') && _c != 'xx')?then(_c,((skill.userLang)!'en'))}"
+    transitions:
+      next: "resolveUserLangName"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  keepPreviousUserLang:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.userLang"
+      value: "${(skill.userLang)!'en'}"
+    transitions:
+      next: "resolveUserLangName"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  resolveUserLangName:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.userLangName"
+      value: "<#assign _l = ((skill.userLang)!'en')><#if _l == 'ar'>Arabic<#elseif _l == 'fr'>French<#elseif _l == 'es'>Spanish<#elseif _l == 'hi'>Hindi<#elseif _l == 'ur'>Urdu<#elseif _l == 'de'>German<#elseif _l == 'zh'>Chinese<#elseif _l == 'tr'>Turkish<#elseif _l == 'id'>Indonesian<#elseif _l == 'tl'>Filipino<#elseif _l == 'bn'>Bengali<#elseif _l == 'ml'>Malayalam<#elseif _l == 'ta'>Tamil<#elseif _l == 'ne'>Nepali<#elseif _l == 'fa'>Persian<#else>English</#if>"
+    transitions:
+      next: "setModality"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  setModality:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.modality"
+      value: "${(((system.message.messagePayload.channelExtensions.speech)!'')?string?lower_case?contains('true'))?then('voice',(((system.message.messagePayload.channelExtensions.modality)!'')?string?lower_case?contains('voice'))?then('voice',((((profile.properties.value.modality)!'')?string?lower_case?contains('voice'))?then('voice','text'))))}"
+    transitions:
+      next: "trimHistory"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  trimHistory:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.questionAnswerHistory"
+      value: "<#if ((skill.questionAnswerHistory)!'')?length gt 8000>${\"### Question\" + ((skill.questionAnswerHistory)!'')?substring(((skill.questionAnswerHistory)!'')?length - 6000)?keep_after(\"### Question\")}<#else>${(skill.questionAnswerHistory)!''}</#if>"
+    transitions:
+      next: "validateInput"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  applyExtractedEndDate:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.filled_endDate"
+      value: "${((skill.preExtractResponse!'{}')?eval_json.endDate)!''}"
+    transitions:
+      next: "applyExtractedPeriod"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  outputForceFinal:
+    component: "System.CommonResponse"
+    properties:
+      metadata:
+        responseItems:
+        - text: "${skill.finalAnswer}"
+          type: "text"
+      keepTurn: true
+    transitions:
+      next: "endFlow"
+    metadata:
+      virtualComponent: "Virtual.Output"
+      propertySheetIsFreeMarkerMap:
+        requiresAuthorization: false
+  resetFilled:
+    component: "System.ResetVariables"
+    properties:
+      variableList: "skill.filled_absenceType,skill.filled_startDate,skill.filled_endDate,skill.filled_period,skill.filled_reason,skill.filled_visaType,skill.filled_validaty,skill.filled_toDate,skill.filled_periodDays,skill.filled_traficViolation,skill.filled_paidFee,skill.filled_floats,skill.filled_activeVisa,skill.filled_iqamaExpiry,skill.filled_confirmation,skill.autoConfirmSummary,skill.attachmentURL"
+    transitions:
+      next: "captureUserQuestion"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variableList: false
+        requiresAuthorization: false
+  initToolsLoop:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.toolsLoop"
+      value: "0"
+    transitions:
+      next: "initToolsHistory"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: false
+        requiresAuthorization: false
+  outputLoopMax:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.renderedMsg"
+      value: "Sorry, I couldn't complete your request. Could you rephrase it more simply?"
+    transitions:
+      next: "outputLoopMaxRender"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  outputLoopMaxRender:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        langName: "${(skill.userLangName)!'English'}"
+        textEn: "${(skill.renderedMsg)!''}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0
+      maxTokens: 400
+      resultVariable: "skill.renderedMsg"
+      standardActions: ""
+      promptTemplate: "Write the TEXT below in ${langName}.\n\nLANGUAGE — ALREADY DECIDED BY THE SYSTEM, DO NOT DETECT IT:\n- If ${langName} is English, output the TEXT unchanged, character for character.\n- Otherwise translate it completely and naturally into ${langName}, leaving no English words behind.\n- Never mix languages.\n- Keep every emoji, bullet, line break, number, date, currency and proper name exactly as it is and exactly where it is.\n- Do NOT add, remove, soften or invent any information.\n\nOutput ONLY the resulting text. No quotes, no labels, no explanation.\n\nTEXT\n${textEn}\n\nOUTPUT"
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment please... لحظة من فضلك"
+    transitions:
+      actions:
+        error: "outputLoopMaxOut"
+      next: "outputLoopMaxOut"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  outputLoopMaxOut:
+    component: "System.CommonResponse"
+    properties:
+      metadata:
+        responseItems:
+        - text: "${skill.renderedMsg}"
+          type: "text"
+      keepTurn: true
+    transitions:
+      next: "endFlow"
+    metadata:
+      virtualComponent: "Virtual.Output"
+      propertySheetIsFreeMarkerMap:
+        requiresAuthorization: false
+  outputEmptyInput:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.renderedMsg"
+      value: "I didn't catch that. Could you please type your question?"
+    transitions:
+      next: "outputEmptyInputRender"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  outputEmptyInputRender:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        langName: "${(skill.userLangName)!'English'}"
+        textEn: "${(skill.renderedMsg)!''}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0
+      maxTokens: 400
+      resultVariable: "skill.renderedMsg"
+      standardActions: ""
+      promptTemplate: "Write the TEXT below in ${langName}.\n\nLANGUAGE — ALREADY DECIDED BY THE SYSTEM, DO NOT DETECT IT:\n- If ${langName} is English, output the TEXT unchanged, character for character.\n- Otherwise translate it completely and naturally into ${langName}, leaving no English words behind.\n- Never mix languages.\n- Keep every emoji, bullet, line break, number, date, currency and proper name exactly as it is and exactly where it is.\n- Do NOT add, remove, soften or invent any information.\n\nOutput ONLY the resulting text. No quotes, no labels, no explanation.\n\nTEXT\n${textEn}\n\nOUTPUT"
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment please... لحظة من فضلك"
+    transitions:
+      actions:
+        error: "outputEmptyInputOut"
+      next: "outputEmptyInputOut"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  outputEmptyInputOut:
+    component: "System.CommonResponse"
+    properties:
+      metadata:
+        responseItems:
+        - text: "${skill.renderedMsg}"
+          type: "text"
+      keepTurn: true
+    transitions:
+      next: "endFlow"
+    metadata:
+      virtualComponent: "Virtual.Output"
+      propertySheetIsFreeMarkerMap:
+        requiresAuthorization: false

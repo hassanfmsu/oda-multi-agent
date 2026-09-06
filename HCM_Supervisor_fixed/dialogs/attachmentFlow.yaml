@@ -1,0 +1,234 @@
+name: "attachmentFlow"
+trackingId: "AAAA0005-0000-0000-0000-000000000005"
+type: "task"
+version: "2.0"
+interface: {}
+configuration:
+  requiresAuthorization: false
+  defaultApplicationContext: false
+  privateThread: false
+variables:
+- name: "attRetry"
+  type: "string"
+  defaultValue: "0"
+  description: "Local retry counter for attachment capture"
+  metadata:
+    isFreeMarker: true
+  system: false
+defaultTransitions:
+  actions:
+    system.startTaskFlow: "resetAttachment"
+states:
+  resetAttachment:
+    component: "System.ResetVariables"
+    properties:
+      variableList: "skill.attachmentURL,skill.parameterResponse"
+    transitions:
+      next: "initRetry"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variableList: false
+        requiresAuthorization: false
+  initRetry:
+    component: "System.SetVariable"
+    properties:
+      variable: "attRetry"
+      value: "0"
+    transitions:
+      next: "askForFile"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  askForFile:
+    component: "System.CommonResponse"
+    properties:
+      metadata:
+        responseItems:
+        - text: "${(user.tool.value.question)!((((skill.userLang)!'en') == 'ar')?then('📎 الشهادة الطبية مطلوبة للإجازة المرضية. يرجى إرفاق ملف PDF أو صورة للشهادة الطبية.','📎 A medical certificate is REQUIRED for sick leave. Please attach a PDF or image of your medical certificate.'))}"
+          type: "text"
+      keepTurn: true
+    transitions:
+      next: "clearFileReply"
+    metadata:
+      virtualComponent: "Virtual.Output"
+      propertySheetIsFreeMarkerMap:
+        requiresAuthorization: false
+  clearFileReply:
+    component: "System.ResetVariables"
+    properties:
+      variableList: "skill.parameterResponse"
+    transitions:
+      next: "waitForFile"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variableList: false
+        requiresAuthorization: false
+  waitForFile:
+    component: "System.CommonResponse"
+    properties:
+      variable: "skill.parameterResponse"
+      processUserMessage: true
+      keepTurn: false
+      maxPrompts: 1
+      prompt: "📎"
+    transitions:
+      next: "captureURL"
+    metadata:
+      virtualComponent: "Virtual.Question"
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        processUserMessage: false
+        keepTurn: false
+        maxPrompts: false
+        prompt: true
+        requiresAuthorization: false
+  captureURL:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.attachmentURL"
+      value: "${(system.message.messagePayload.attachment.url)!(system.message.messagePayload.attachments[0].url)!(system.message.messagePayload.attachments[0].contentUrl)!(system.message.messagePayload.channelExtensions.attachment.url)!(system.message.messagePayload.channelExtensions.attachments[0].contentUrl)!''}"
+    transitions:
+      next: "incrementRetry"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  incrementRetry:
+    component: "System.SetVariable"
+    properties:
+      variable: "attRetry"
+      value: "${(attRetry?number + 1)?c}"
+    transitions:
+      next: "validateAttachment"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  validateAttachment:
+    component: "System.Switch"
+    properties:
+      source: "${((skill.attachmentURL!'')?length > 0)?then('OK',(attRetry?number >= 3)?then('GIVEUP','MISSING'))}"
+    transitions:
+      actions:
+        OK: "returnOK"
+        MISSING: "askForFileAgain"
+        GIVEUP: "returnGiveup"
+      next: "returnGiveup"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        source: true
+        requiresAuthorization: false
+  askForFileAgain:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.renderedMsg"
+      value: "📎 A medical certificate is required to submit a sick leave request. Please attach a PDF or image of your medical certificate now."
+    transitions:
+      next: "askForFileAgainRender"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  askForFileAgainRender:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        langName: "${(skill.userLangName)!'English'}"
+        textEn: "${(skill.renderedMsg)!''}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0
+      maxTokens: 400
+      resultVariable: "skill.renderedMsg"
+      standardActions: ""
+      promptTemplate: "Write the TEXT below in ${langName}.\n\nLANGUAGE — ALREADY DECIDED BY THE SYSTEM, DO NOT DETECT IT:\n- If ${langName} is English, output the TEXT unchanged, character for character.\n- Otherwise translate it completely and naturally into ${langName}, leaving no English words behind.\n- Never mix languages.\n- Keep every emoji, bullet, line break, number, date, currency and proper name exactly as it is and exactly where it is.\n- Do NOT add, remove, soften or invent any information.\n\nOutput ONLY the resulting text. No quotes, no labels, no explanation.\n\nTEXT\n${textEn}\n\nOUTPUT"
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment please... لحظة من فضلك"
+    transitions:
+      actions:
+        error: "askForFileAgainOut"
+      next: "askForFileAgainOut"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  askForFileAgainOut:
+    component: "System.CommonResponse"
+    properties:
+      metadata:
+        responseItems:
+        - text: "${skill.renderedMsg}"
+          type: "text"
+      keepTurn: true
+    transitions:
+      next: "waitForFile"
+    metadata:
+      virtualComponent: "Virtual.Output"
+      propertySheetIsFreeMarkerMap:
+        requiresAuthorization: false
+  returnOK:
+    component: "System.InvokeFlow"
+    properties:
+      inputParameters:
+      - name: "lastTool"
+        value: "attachment"
+      - name: "lastToolResult"
+        value: "Attachment uploaded successfully. attachmentURL=${skill.attachmentURL}"
+      flow: "loopFlow"
+      outputParameters: []
+    transitions: {}
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        flow: false
+  returnGiveup:
+    component: "System.InvokeFlow"
+    properties:
+      inputParameters:
+      - name: "lastTool"
+        value: "attachment"
+      - name: "lastToolResult"
+        value: "FAILED: Could not capture a medical certificate after multiple attempts. Sick leave submission CANNOT proceed without a medical certificate. Tell the user the request was cancelled because a medical certificate is required for sick leave, and ask them to try again later when they have the file ready, or to contact HR."
+      flow: "loopFlow"
+      outputParameters: []
+    transitions: {}
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        flow: false

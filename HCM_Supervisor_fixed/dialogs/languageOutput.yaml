@@ -1,0 +1,153 @@
+name: "languageOutput"
+trackingId: "AAAA0007-0000-0000-0000-000000000007"
+type: "task"
+version: "2.0"
+interface: {}
+configuration:
+  requiresAuthorization: false
+  defaultApplicationContext: false
+  privateThread: false
+variables:
+- name: "langCode"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "answerEn"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+defaultTransitions:
+  actions:
+    system.startTaskFlow: "captureFinal"
+states:
+  captureFinal:
+    component: "System.SetVariable"
+    properties:
+      variable: "answerEn"
+      value: "${(user.tool.value.text)!'I could not produce an answer. Please try rephrasing your question.'}"
+    transitions:
+      next: "detectLang"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  detectLang:
+    component: "System.SetVariable"
+    properties:
+      variable: "langCode"
+      value: "${(skill.userLang)!'en'}"
+    transitions:
+      next: "normalizeLang"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  normalizeLang:
+    component: "System.SetVariable"
+    properties:
+      variable: "langCode"
+      value: "${((((langCode!'')?trim?lower_case)?length) gt 1)?then(((langCode!'')?trim?lower_case)?substring(0,2),'en')}"
+    transitions:
+      next: "renderFinal"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  renderFinal:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        targetLang: "${(langCode)!'en'}"
+        textEn: "${(answerEn)!''}"
+        modality: "${(skill.modality)!'text'}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0
+      maxTokens: 600
+      resultVariable: "skill.finalAnswer"
+      standardActions: ""
+      promptTemplate: "Write the TEXT below in the language identified by the two-letter ISO 639-1 code given under TARGET LANGUAGE, formatted for the delivery channel given under MODALITY.\n\nLANGUAGE RULES:\n- If TARGET LANGUAGE is en, keep the wording in English.\n- Otherwise translate it naturally into that language. Never mix languages.\n- Do NOT add, remove, soften or invent any fact, number, name or date. Convey exactly the same information.\n- Keep every number, date and proper name exactly as it appears.\n\nIF MODALITY IS text:\n- Output the TEXT unchanged, character for character, when TARGET LANGUAGE is en. Otherwise translate it and keep every emoji and line break exactly where they are.\n\nIF MODALITY IS voice:\n- The result will be READ ALOUD by a speech synthesiser, so write it to be HEARD, not seen.\n- Remove every emoji and every decorative symbol. Never describe them.\n- Use flowing sentences. No bullet points, no numbered lists, no tables, no line breaks used as columns.\n- Speak dates naturally: 2026-09-09 becomes the ninth of September twenty twenty-six, in the target language.\n- Never say a URL, a file name, or a technical field name.\n- Keep it short. Two or three sentences at most. If the TEXT is a long list, say how many items there are and mention only the most important one or two, then offer to go through the rest.\n- Never invent a number to shorten something. If you cannot shorten without losing a figure the employee asked for, say the figure.\n\nOutput ONLY the resulting text. No quotes, no labels, no explanation.\n\nMODALITY\n${modality}\n\nTARGET LANGUAGE\n${targetLang}\n\nTEXT\n${textEn}\n\nOUTPUT"
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment please... لحظة من فضلك"
+    transitions:
+      actions:
+        error: "fallbackFinal"
+      next: "outputDirect"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  fallbackFinal:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.finalAnswer"
+      value: "${(answerEn)!'I could not produce an answer. Please try rephrasing your question.'}"
+    transitions:
+      next: "outputDirect"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  outputDirect:
+    component: "System.CommonResponse"
+    properties:
+      metadata:
+        responseItems:
+        - text: "${(skill.finalAnswer)!(answerEn)!'I could not produce an answer. Please try rephrasing your question.'}"
+          type: "text"
+      keepTurn: true
+    transitions:
+      next: "appendHistory"
+    metadata:
+      virtualComponent: "Virtual.Output"
+      propertySheetIsFreeMarkerMap:
+        requiresAuthorization: false
+  appendHistory:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.questionAnswerHistory"
+      value: "${(skill.questionAnswerHistory)!''}\n\n### Question\n${(skill.userQuestion)!''}\n### Answer\n${(skill.finalAnswer)!''}"
+    transitions: {}
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false

@@ -1,0 +1,916 @@
+name: "parameterFlow"
+trackingId: "AAAA0004-0000-0000-0000-000000000004"
+type: "task"
+version: "2.0"
+interface: {}
+configuration:
+  requiresAuthorization: false
+  defaultApplicationContext: false
+  privateThread: false
+variables:
+- name: "normalizedDate"
+  type: "string"
+  description: "Normalized YYYY-MM-DD or INVALID or CANCEL"
+  metadata:
+    isFreeMarker: true
+  system: false
+defaultTransitions:
+  actions:
+    system.startTaskFlow: "resetParam"
+states:
+  resetParam:
+    component: "System.ResetVariables"
+    properties:
+      variableList: "skill.parameterResponse,normalizedDate,skill.llmResp"
+    transitions:
+      next: "translateQuestion"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variableList: false
+        requiresAuthorization: false
+  translateQuestion:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        langName: "${(skill.userLangName)!'English'}"
+        questionEn: "${(user.tool.value.question)!'Please provide the missing information.'}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0
+      maxTokens: 256
+      resultVariable: "skill.llmResp"
+      standardActions: ""
+      promptTemplate: "Write the QUESTION below in ${langName}.\n\nLANGUAGE — ALREADY DECIDED BY THE SYSTEM, DO NOT DETECT IT:\n- Do NOT detect, guess or infer the language from any text. The target language is ${langName} and nothing else changes it.\n- If ${langName} is English, output the question in English. If the QUESTION already arrived in another language, rewrite it in English — never pass non-English text through.\n- If ${langName} is Arabic, output the question fully in Arabic, with no English words left in it.\n- Never mix languages in one question.\n- Output ONLY the resulting question. No quotes, no labels, no explanation.\n- Keep date format examples (like 'YYYY-MM-DD' or '2026-05-07') exactly as-is — do NOT translate placeholders or date formats.\n- Keep proper names and emoji unchanged.\n\nQUESTION (may arrive in any language):\n${questionEn}\n\nQuestion written in ${langName}:"
+      undoButtonLabel: "Undo"
+      retryUserMessage: "..."
+    transitions:
+      actions:
+        error: "setFallbackQuestion"
+      next: "askQuestion"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  setFallbackQuestion:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.llmResp"
+      value: "${(user.tool.value.question)!'Please provide the missing information.'}"
+    transitions:
+      next: "askQuestion"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  askQuestion:
+    component: "System.CommonResponse"
+    properties:
+      variable: "skill.parameterResponse"
+      processUserMessage: true
+      prompt: "${skill.llmResp}"
+    transitions:
+      next: "checkCancel"
+    metadata:
+      virtualComponent: "Virtual.Question"
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        prompt: true
+        requiresAuthorization: false
+  checkCancel:
+    component: "System.Switch"
+    properties:
+      source: "${((skill.parameterResponse!'')?lower_case?trim?matches('(cancel|cancel it|cancel please|stop|stop it|quit|nevermind|never mind|forget it|forget about it|abort|no thanks|not now|i don.?t want it|i do not want it|i am not interested|not interested|إلغاء|الغاء|الغه|الغي|ألغِ|توقف|انسى|خلاص|ما ابي|ما اريد|لا اريد|ما ابغى|لا ابغى|ابطل)[ .!؟]*'))?then('CANCEL','GO')}"
+    transitions:
+      actions:
+        CANCEL: "resetAfterCancel"
+        GO: "checkIfDateParam"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        source: true
+        requiresAuthorization: false
+  outputCancelled:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.renderedMsg"
+      value: "Request cancelled. Is there anything else I can help you with?"
+    transitions:
+      next: "outputCancelledRender"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  outputCancelledRender:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        langName: "${(skill.userLangName)!'English'}"
+        textEn: "${(skill.renderedMsg)!''}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0
+      maxTokens: 400
+      resultVariable: "skill.renderedMsg"
+      standardActions: ""
+      promptTemplate: "Write the TEXT below in ${langName}.\n\nLANGUAGE — ALREADY DECIDED BY THE SYSTEM, DO NOT DETECT IT:\n- If ${langName} is English, output the TEXT unchanged, character for character.\n- Otherwise translate it completely and naturally into ${langName}, leaving no English words behind.\n- Never mix languages.\n- Keep every emoji, bullet, line break, number, date, currency and proper name exactly as it is and exactly where it is.\n- Do NOT add, remove, soften or invent any information.\n\nOutput ONLY the resulting text. No quotes, no labels, no explanation.\n\nTEXT\n${textEn}\n\nOUTPUT"
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment please... لحظة من فضلك"
+    transitions:
+      actions:
+        error: "outputCancelledOut"
+      next: "outputCancelledOut"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  outputCancelledOut:
+    component: "System.CommonResponse"
+    properties:
+      metadata:
+        responseItems:
+        - text: "${skill.renderedMsg}"
+          type: "text"
+      keepTurn: true
+    transitions: {}
+    metadata:
+      virtualComponent: "Virtual.Output"
+      propertySheetIsFreeMarkerMap:
+        requiresAuthorization: false
+  checkIfDateParam:
+    component: "System.Switch"
+    properties:
+      source: "${((user.tool.value.parameter)!'')?matches('startDate|endDate|validaty|toDate|date')?then('DATE','TEXT')}"
+    transitions:
+      actions:
+        DATE: "normalizeDate"
+        TEXT: "returnToLoop"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        source: true
+        requiresAuthorization: false
+  normalizeDate:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        userText: "${skill.parameterResponse}"
+        today: "${.now?string('yyyy-MM-dd')}"
+        paramName: "${(user.tool.value.parameter)!'date'}"
+        knownStartDate: "${(skill.filled_startDate)!''}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0
+      maxTokens: 16
+      resultVariable: "normalizedDate"
+      standardActions: ""
+      promptTemplate: "Convert the user's date text into YYYY-MM-DD format. Output ONLY the date, nothing else.\n\nToday is: ${today}\nField being collected: ${paramName}\n\nRules:\n- If the text describes a clear date, output it in YYYY-MM-DD format.\n- If the text contains \"only\", \"just\", \"for one day\", or similar single-day phrasing, output the single date.\n- If the text mentions multiple dates (e.g., \"from May 6 to May 10\"), output the FIRST date for startDate, or the LAST date for endDate based on the field name.\n- If the text is unparseable as a date, output exactly: INVALID\n- Output ONLY the date or \"INVALID\". No explanation. No quotes. No extra text.\n\n\nSPECIAL RULE for endDate field — SAME-DAY phrasing:\n- The known startDate is: ${knownStartDate}\n- If paramName is \"endDate\" AND startDate is filled AND the user says any of: \"only one day\", \"just one day\", \"same day\", \"same as start\", \"one day\", \"1 day\", \"نفس اليوم\", \"يوم واحد\", \"فقط يوم\", \"بس يوم\", \"لنفس اليوم\"\n- → Output the same date as startDate (i.e. ${knownStartDate})\n\nSPECIAL RULE for endDate field — DURATION phrasing (\"N days\"):\n- If paramName is \"endDate\" AND startDate is filled AND the user gives a DURATION (number of days), output startDate + (N - 1). The duration is INCLUSIVE.\n- Recognize these duration patterns: \"N days\", \"N days only\", \"N days just\", \"for N days\", \"just N days\", \"only N days\", \"two days\", \"three days\", \"two days only\", \"يومين\", \"3 ايام\", \"٣ ايام\", \"اربعة ايام\", \"اسبوع\" (=7), \"اسبوعين\" (=14), \"a week\" (=7), \"two weeks\" (=14).\n- A duration phrase is NEVER a date itself. Do NOT interpret \"two days\" as a date like \"May 13\".\n- If you cannot resolve the duration into a date because startDate is empty, output: INVALID\n\nExamples for SAME-DAY:\nToday=2026-05-04, knownStartDate=2026-05-10, paramName=endDate, Text=\"only one day\" → 2026-05-10\nToday=2026-05-04, knownStartDate=2026-05-10, paramName=endDate, Text=\"same day\" → 2026-05-10\nToday=2026-05-04, knownStartDate=2026-05-10, paramName=endDate, Text=\"نفس اليوم\" → 2026-05-10\nToday=2026-05-04, knownStartDate=2026-05-10, paramName=endDate, Text=\"يوم واحد\" → 2026-05-10\n\nExamples for DURATION (note: N days = startDate + N - 1):\nToday=2026-05-11, knownStartDate=2026-05-17, paramName=endDate, Text=\"two days only\" → 2026-05-18\nToday=2026-05-11, knownStartDate=2026-05-17, paramName=endDate, Text=\"two days\" → 2026-05-18\nToday=2026-05-11, knownStartDate=2026-05-17, paramName=endDate, Text=\"3 days\" → 2026-05-19\nToday=2026-05-11, knownStartDate=2026-05-17, paramName=endDate, Text=\"for 5 days\" → 2026-05-21\nToday=2026-05-11, knownStartDate=2026-05-17, paramName=endDate, Text=\"a week\" → 2026-05-23\nToday=2026-05-11, knownStartDate=2026-05-17, paramName=endDate, Text=\"يومين\" → 2026-05-18\nToday=2026-05-11, knownStartDate=2026-05-17, paramName=endDate, Text=\"3 ايام\" → 2026-05-19\nToday=2026-05-11, knownStartDate=2026-05-17, paramName=endDate, Text=\"اسبوع\" → 2026-05-23\n\nExamples (general):\nToday=2026-05-04, Text=\"may 7\" → 2026-05-07\nToday=2026-05-04, Text=\"May 7 only\" → 2026-05-07\nToday=2026-05-04, Text=\"tomorrow\" → 2026-05-05\nToday=2026-05-04, Text=\"tomorrow only\" → 2026-05-05\nToday=2026-05-04, Text=\"day after tomorrow\" → 2026-05-06\nToday=2026-05-04, Text=\"next monday\" → 2026-05-11\nToday=2026-05-04, Text=\"next week\" (paramName=startDate) → 2026-05-11\nToday=2026-05-04, Text=\"next week\" (paramName=endDate) → 2026-05-15\nToday=2026-05-04, Text=\"from may 6 to may 10\" (paramName=startDate) → 2026-05-06\nToday=2026-05-04, Text=\"from may 6 to may 10\" (paramName=endDate) → 2026-05-10\nToday=2026-05-04, Text=\"2026-06-15\" → 2026-06-15\nToday=2026-05-04, Text=\"15/06/2026\" → 2026-06-15\nToday=2026-05-04, Text=\"بكره\" → 2026-05-05\nToday=2026-05-04, Text=\"بعد بكره\" → 2026-05-06\nToday=2026-05-04, Text=\"hello\" → INVALID\nToday=2026-05-04, Text=\"123abc\" → INVALID\n\nNow convert this:\nText: \"${userText}\"\n\nOutput:\n"
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment please... لحظة من فضلك"
+    transitions:
+      actions:
+        error: "returnToLoopAsRaw"
+      next: "checkNormalized"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  checkNormalized:
+    component: "System.Switch"
+    properties:
+      source: "${(normalizedDate?trim?matches('\\\\d{4}-\\\\d{2}-\\\\d{2}'))?then('VALID','INVALID')}"
+    transitions:
+      actions:
+        VALID: "returnNormalized"
+        INVALID: "returnToLoopAsRaw"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        source: true
+        requiresAuthorization: false
+  returnNormalized:
+    component: "System.Switch"
+    properties:
+      source: "${((user.tool.value.parameter)!'')}"
+    transitions:
+      actions:
+        startDate: "setFilledStartDate"
+        endDate: "setFilledEndDate"
+        validaty: "setFilledValidaty"
+        toDate: "setFilledToDate"
+      next: "returnNormalizedToLoop"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        source: true
+        requiresAuthorization: false
+  setFilledStartDate:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.filled_startDate"
+      value: "${normalizedDate?trim}"
+    transitions:
+      next: "checkIfHoursLeave"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  setFilledEndDate:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.filled_endDate"
+      value: "${normalizedDate?trim}"
+    transitions:
+      next: "returnNormalizedToLoop"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  setFilledValidaty:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.filled_validaty"
+      value: "${normalizedDate?trim}"
+    transitions:
+      next: "returnNormalizedToLoop"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  setFilledToDate:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.filled_toDate"
+      value: "${normalizedDate?trim}"
+    transitions:
+      next: "computePeriodDays"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  computePeriodDays:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.filled_periodDays"
+      value: "${((((skill.filled_toDate)?date('yyyy-MM-dd')?long - ((skill.filled_validaty)!.now?string('yyyy-MM-dd'))?date('yyyy-MM-dd')?long) / 86400000)?round)?c}"
+    transitions:
+      next: "returnNormalizedToLoop"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  returnNormalizedToLoop:
+    component: "System.InvokeFlow"
+    properties:
+      inputParameters:
+      - name: "lastTool"
+        value: "parameter"
+      - name: "lastToolResult"
+        value: "FILLED parameter '${(user.tool.value.parameter)!'unknown'}' for tool '${(user.tool.value.for_tool)!'unknown'}' = ${normalizedDate?trim} (this parameter is NOW COMPLETE — do not ask for it again. Original user phrasing was: '${skill.parameterResponse}')"
+      flow: "loopFlow"
+      outputParameters: []
+    transitions: {}
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        flow: false
+  returnToLoopAsRaw:
+    component: "System.InvokeFlow"
+    properties:
+      inputParameters:
+      - name: "lastTool"
+        value: "parameter"
+      - name: "lastToolResult"
+        value: "User attempted to answer parameter '${(user.tool.value.parameter)!'unknown'}' for tool '${(user.tool.value.for_tool)!'unknown'}' with text: '${skill.parameterResponse}' but it could not be parsed as a valid date. Ask the user again with a clear example like 'May 7' or '2026-05-07' or 'tomorrow'."
+      flow: "loopFlow"
+      outputParameters: []
+    transitions: {}
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        flow: false
+  returnToLoop:
+    component: "System.Switch"
+    properties:
+      source: "${((user.tool.value.parameter)!'')}"
+    transitions:
+      actions:
+        absenceType: "normalizeAbsenceType"
+        period: "normalizePeriod"
+        reason: "normalizeReason"
+        visaType: "normalizeVisaType"
+        periodDays: "setFilledPeriodDays"
+        traficViolation: "setFilledTraficViolation"
+        paidFee: "setFilledPaidFee"
+        floats: "setFilledFloats"
+        activeVisa: "setFilledActiveVisa"
+        iqamaExpiry: "setFilledIqamaExpiry"
+      next: "returnTextToLoop"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        source: true
+        requiresAuthorization: false
+  normalizeAbsenceType:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        userText: "${(skill.parameterResponse)!''}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0
+      maxTokens: 16
+      resultVariable: "skill.llmResp"
+      standardActions: ""
+      promptTemplate: "Map the user's text to ONE canonical absence type, or output INVALID. Output ONLY the canonical name or the word INVALID. No explanation. No quotes.\n\nCanonical types (exact spelling):\n- Annual Leave\n- Sick Leave\n- Hours Leave\n- Emergency Leave\n- Marriage Vacation\n- Hajj Vacation\n- Death Vacation\n- Examination Leave\n- Birth of New Child\n- Remote Working\n\nMappings:\n- annual, vacation, holiday, سنوية, اجازة سنوية → Annual Leave\n- sick, illness, مرضية, مرض → Sick Leave\n- hours, hour, permission, permession, permision, إذن, إذن خروج, ساعات, اذن → Hours Leave\n- emergency, urgent, طارئة, طوارئ → Emergency Leave\n- marriage, wedding, زواج → Marriage Vacation\n- hajj, حج → Hajj Vacation\n- death, bereavement, funeral, وفاة, عزاء → Death Vacation\n- exam, examination, اختبار → Examination Leave\n- birth, newborn, paternity, maternity, وضع → Birth of New Child\n- remote, work from home, wfh, عن بعد → Remote Working\n\nIf the text is unclear, off-topic, a cancellation phrase, or doesn't match any type → INVALID\n\nUser text: \"${userText}\"\n\nOutput:"
+      undoButtonLabel: "Undo"
+      retryUserMessage: "..."
+    transitions:
+      actions:
+        error: "returnInvalidAbsenceType"
+      next: "checkNormalizedAbsenceType"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  checkNormalizedAbsenceType:
+    component: "System.Switch"
+    properties:
+      source: "${((skill.llmResp!'')?trim?upper_case == 'INVALID')?then('INVALID',((skill.llmResp!'')?trim?length == 0)?then('INVALID','VALID'))}"
+    transitions:
+      actions:
+        VALID: "setFilledAbsenceType"
+        INVALID: "returnInvalidAbsenceType"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        source: true
+        requiresAuthorization: false
+  setFilledAbsenceType:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.filled_absenceType"
+      value: "${(skill.llmResp!skill.parameterResponse)?trim}"
+    transitions:
+      next: "checkIfHoursLeaveAfterType"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  returnInvalidAbsenceType:
+    component: "System.InvokeFlow"
+    properties:
+      inputParameters:
+      - name: "lastTool"
+        value: "parameter"
+      - name: "lastToolResult"
+        value: "User answered absenceType with: '${skill.parameterResponse}', but it does not match any valid leave type. Ask the user again, listing the available options: Annual Leave, Sick Leave, Hours Leave, Emergency Leave, Marriage Vacation, Hajj Vacation, Death Vacation, Examination Leave, Birth of New Child, Remote Working. If the user wants to cancel, call result with a polite cancellation."
+      flow: "loopFlow"
+      outputParameters: []
+    transitions: {}
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        flow: false
+  normalizePeriod:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        userText: "${(skill.parameterResponse)!''}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0
+      maxTokens: 16
+      resultVariable: "skill.llmResp"
+      standardActions: ""
+      promptTemplate: "Map the user's text to ONE canonical Hours-Leave period, or output INVALID. Output ONLY the canonical value or the word INVALID. No explanation. No quotes.\n\nCanonical values:\n- Morning - صباحا\n- Evening - مساء\n\nMappings:\n- morning, am, early, صباح, صباحا, صباحي, الصباح → Morning - صباحا\n- evening, afternoon, pm, late, مساء, بعد الظهر, العصر, مسائي → Evening - مساء\n\nIf the user typed dates, numbers, or anything that is not clearly morning/evening → INVALID\n\nUser text: \"${userText}\"\n\nOutput:"
+      undoButtonLabel: "Undo"
+      retryUserMessage: "..."
+    transitions:
+      actions:
+        error: "returnInvalidPeriod"
+      next: "checkNormalizedPeriod"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  checkNormalizedPeriod:
+    component: "System.Switch"
+    properties:
+      source: "${((skill.llmResp!'')?trim?upper_case == 'INVALID')?then('INVALID',((skill.llmResp!'')?trim?length == 0)?then('INVALID','VALID'))}"
+    transitions:
+      actions:
+        VALID: "setFilledPeriod"
+        INVALID: "returnInvalidPeriod"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        source: true
+        requiresAuthorization: false
+  setFilledPeriod:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.filled_period"
+      value: "${(skill.llmResp!skill.parameterResponse)?trim}"
+    transitions:
+      next: "returnTextToLoop"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  returnInvalidPeriod:
+    component: "System.InvokeFlow"
+    properties:
+      inputParameters:
+      - name: "lastTool"
+        value: "parameter"
+      - name: "lastToolResult"
+        value: "User answered period with: '${skill.parameterResponse}', but it is not a valid Hours-Leave period. Ask the user again to choose: Morning - صباحا OR Evening - مساء."
+      flow: "loopFlow"
+      outputParameters: []
+    transitions: {}
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        flow: false
+  normalizeReason:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        userText: "${(skill.parameterResponse)!''}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0
+      maxTokens: 16
+      resultVariable: "skill.llmResp"
+      standardActions: ""
+      promptTemplate: "Map the user's text to ONE canonical Sick-Leave reason. Output ONLY the canonical value exactly as spelled below. No explanation. No quotes. No extra words.\n\nCanonical values (exact spelling):\n- Arthritis\n- Contagious illness\n- Diarrhea\n- Flu\n- General Allergies\n- General Injuries\n- Headache\n- High Fever\n- Illness that negatively impacts productivity\n- Indigestion\n- Other\n- Sinusitis\n- Surgery\n- Torn ligament\n- Vomiting\n\nMappings:\n- cold, flu, زكام, برد, إنفلونزا, انفلونزا → Flu\n- stomach ache, indigestion, عسر هضم, ألم بالمعدة → Indigestion\n- headache, migraine, صداع, شقيقة → Headache\n- high fever, temperature, حرارة, حمى → High Fever\n- vomiting, nausea, throwing up, استفراغ, غثيان, ترجيع → Vomiting\n- allergy, allergies, حساسية → General Allergies\n- diarrhea, اسهال, إسهال → Diarrhea\n- surgery, operation, عملية, جراحة → Surgery\n- injury, injuries, إصابة, إصابات → General Injuries\n- arthritis, joint pain, التهاب المفاصل → Arthritis\n- sinus, sinusitis, جيوب أنفية → Sinusitis\n- torn ligament, sprain, تمزق, رباط → Torn ligament\n- contagious, infectious, معدي, عدوى → Contagious illness\n\nIf the text does not clearly match any specific reason above, output exactly: Other\n\nUser text: \"${userText}\"\n\nOutput:"
+      undoButtonLabel: "Undo"
+      retryUserMessage: "..."
+    transitions:
+      actions:
+        error: "setFilledReason"
+      next: "setFilledReason"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  setFilledReason:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.filled_reason"
+      value: "${((skill.llmResp!'')?trim?length gt 0)?then((skill.llmResp)?trim,'Other')}"
+    transitions:
+      next: "returnTextToLoop"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  normalizeVisaType:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        userText: "${(skill.parameterResponse)!''}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0
+      maxTokens: 16
+      resultVariable: "skill.llmResp"
+      standardActions: ""
+      promptTemplate: "Map the user's text to ONE canonical Exit / Re-entry visa type, or output INVALID. Output ONLY the canonical value or the word INVALID. No explanation. No quotes.\n\nThere are EXACTLY TWO valid values — copy them verbatim, keeping this exact spelling and capitalisation:\n- One Visit\n- multiple visit\n\nMappings:\n- one, single, once, one time, single visit, one visit, واحدة, مرة واحدة, زيارة واحدة, خروج وعودة مرة واحدة → One Visit\n- multi, multiple, many, several, repeated, multi visit, multiple visits, متعددة, متعدد, عدة مرات, مرات متعددة, خروج وعودة متعددة → multiple visit\n\nIf the text is unclear, is a cancellation phrase, or names anything that is not one of these two (for example \"final exit\", \"exit only\", \"exit re-entry\") → INVALID\n\nUser text: \"${userText}\"\n\nOutput:"
+      undoButtonLabel: "Undo"
+      retryUserMessage: "..."
+    transitions:
+      actions:
+        error: "setFilledVisaType"
+      next: "checkNormalizedVisaType"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  checkNormalizedVisaType:
+    component: "System.Switch"
+    properties:
+      source: "${((skill.llmResp!'')?trim?upper_case == 'INVALID')?then('INVALID',((skill.llmResp!'')?trim?length == 0)?then('INVALID','VALID'))}"
+    transitions:
+      actions:
+        VALID: "setFilledVisaType"
+        INVALID: "returnInvalidVisaType"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        source: true
+        requiresAuthorization: false
+  returnInvalidVisaType:
+    component: "System.InvokeFlow"
+    properties:
+      inputParameters:
+      - name: "lastTool"
+        value: "parameter"
+      - name: "lastToolResult"
+        value: "User answered visaType with: '${skill.parameterResponse}', but it is not a valid visa type. Ask the user again and offer ONLY these two options: 'One Visit' or 'multiple visit'. Do not suggest any other visa type."
+      flow: "loopFlow"
+      outputParameters: []
+    transitions: {}
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        flow: false
+  setFilledVisaType:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.filled_visaType"
+      value: "${(skill.llmResp!skill.parameterResponse)?trim}"
+    transitions:
+      next: "setValidatyToday"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  setValidatyToday:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.filled_validaty"
+      value: "${.now?string('yyyy-MM-dd')}"
+    transitions:
+      next: "returnTextToLoop"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  setFilledPeriodDays:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.filled_periodDays"
+      value: "${skill.parameterResponse}"
+    transitions:
+      next: "returnTextToLoop"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  setFilledTraficViolation:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.filled_traficViolation"
+      value: "${((skill.parameterResponse!'')?lower_case?contains('yes'))?then('Yes',((skill.parameterResponse!'')?contains('نعم'))?then('Yes',((skill.parameterResponse!'')?contains('ايوه'))?then('Yes',((skill.parameterResponse!'')?contains('أيوه'))?then('Yes',((skill.parameterResponse!'')?contains('تمام'))?then('Yes',((skill.parameterResponse!'')?lower_case?trim == 'y')?then('Yes','No'))))))}"
+    transitions:
+      next: "returnTextToLoop"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  setFilledPaidFee:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.filled_paidFee"
+      value: "${((skill.parameterResponse!'')?lower_case?contains('yes'))?then('Yes',((skill.parameterResponse!'')?contains('نعم'))?then('Yes',((skill.parameterResponse!'')?contains('ايوه'))?then('Yes',((skill.parameterResponse!'')?contains('أيوه'))?then('Yes',((skill.parameterResponse!'')?contains('تمام'))?then('Yes',((skill.parameterResponse!'')?lower_case?trim == 'y')?then('Yes','No'))))))}"
+    transitions:
+      next: "returnTextToLoop"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  setFilledFloats:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.filled_floats"
+      value: "${skill.parameterResponse}"
+    transitions:
+      next: "returnTextToLoop"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  setFilledActiveVisa:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.filled_activeVisa"
+      value: "${skill.parameterResponse}"
+    transitions:
+      next: "returnTextToLoop"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  setFilledIqamaExpiry:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.filled_iqamaExpiry"
+      value: "${((skill.parameterResponse!'')?lower_case?contains('yes'))?then('Yes',((skill.parameterResponse!'')?contains('نعم'))?then('Yes',((skill.parameterResponse!'')?contains('ايوه'))?then('Yes',((skill.parameterResponse!'')?contains('أيوه'))?then('Yes',((skill.parameterResponse!'')?contains('تمام'))?then('Yes',((skill.parameterResponse!'')?lower_case?trim == 'y')?then('Yes','No'))))))}"
+    transitions:
+      next: "returnTextToLoop"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  returnTextToLoop:
+    component: "System.InvokeFlow"
+    properties:
+      inputParameters:
+      - name: "lastTool"
+        value: "parameter"
+      - name: "lastToolResult"
+        value: "FILLED parameter '${(user.tool.value.parameter)!'unknown'}' for tool '${(user.tool.value.for_tool)!'unknown'}' = ${skill.parameterResponse} (this parameter is NOW COMPLETE — do not ask for it again)"
+      flow: "loopFlow"
+      outputParameters: []
+    transitions: {}
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        flow: false
+  checkIfHoursLeave:
+    component: "System.Switch"
+    properties:
+      source: "${(skill.filled_absenceType!'')?lower_case?contains('hours')?then('YES','NO')}"
+    transitions:
+      actions:
+        "YES": "autoFillEndDateForHours"
+      next: "returnNormalizedToLoop"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        source: true
+        requiresAuthorization: false
+  autoFillEndDateForHours:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.filled_endDate"
+      value: "${(skill.filled_startDate)!''}"
+    transitions:
+      next: "returnNormalizedToLoop"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  checkIfHoursLeaveAfterType:
+    component: "System.Switch"
+    properties:
+      source: "${(skill.filled_absenceType!'')?lower_case?contains('hours')?then('YES','NO')}"
+    transitions:
+      actions:
+        "YES": "autoFillEndDateForHoursAfterType"
+      next: "returnTextToLoop"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        source: true
+        requiresAuthorization: false
+  autoFillEndDateForHoursAfterType:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.filled_endDate"
+      value: "${(skill.filled_startDate)!''}"
+    transitions:
+      next: "returnTextToLoop"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  resetAfterCancel:
+    component: "System.ResetVariables"
+    properties:
+      variableList: "skill.filled_absenceType,skill.filled_startDate,skill.filled_endDate,skill.filled_period,skill.filled_reason,skill.filled_visaType,skill.filled_validaty,skill.filled_toDate,skill.filled_periodDays,skill.filled_traficViolation,skill.filled_paidFee,skill.filled_floats,skill.filled_activeVisa,skill.filled_iqamaExpiry,skill.filled_confirmation,skill.autoConfirmSummary,skill.preExtractResponse,skill.parameterResponse"
+    transitions:
+      next: "outputCancelled"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variableList: false
+        requiresAuthorization: false

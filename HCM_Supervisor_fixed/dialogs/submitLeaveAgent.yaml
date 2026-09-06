@@ -1,0 +1,889 @@
+name: "submitLeaveAgent"
+trackingId: "AAAA000E-0000-0000-0000-00000000000E"
+type: "task"
+version: "2.0"
+interface: {}
+configuration:
+  requiresAuthorization: false
+  defaultApplicationContext: false
+  privateThread: false
+variables:
+- name: "absenceType"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "startDate"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "endDate"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "period"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "reason"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "sickAttachment"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "sickAttFileName"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "sickAttRetry"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "leaveLLMResponse"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "leaveStatus"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "leaveSubmitResult"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "LeaveAPIResponse"
+  type: "map"
+  metadata:
+    isFreeMarker: false
+  system: false
+- name: "errorReason"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "now"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "confirmReply"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "confirmResult"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "confirmPrompt"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "noticeMsg"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "askMsg"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+defaultTransitions:
+  actions:
+    system.startTaskFlow: "resetVariables"
+states:
+  resetVariables:
+    component: "System.ResetVariables"
+    properties:
+      variableList: "absenceType,startDate,endDate,period,reason,sickAttachment,sickAttFileName,sickAttRetry,leaveLLMResponse,leaveStatus,leaveSubmitResult,LeaveAPIResponse,errorReason,now,confirmReply,confirmResult,confirmPrompt,noticeMsg,askMsg"
+    transitions:
+      next: "setnow"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variableList: false
+        requiresAuthorization: false
+  setnow:
+    component: "System.SetVariable"
+    properties:
+      variable: "now"
+      value: "${.now?string('yyyy-MM-dd')}"
+    transitions:
+      next: "invokeLeaveLLM"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  invokeLeaveLLM:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: true
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: true
+      promptTemplateParameters:
+        question: "${((skill.question)!'')?replace('<not set>','')}"
+        absenceType: "${((absenceType)!'')?replace('<not set>','')}"
+        startDate: "${((startDate)!'')?replace('<not set>','')}"
+        endDate: "${((endDate)!'')?replace('<not set>','')}"
+        period: "${((period)!'')?replace('<not set>','')}"
+        reason: "${((reason)!'')?replace('<not set>','')}"
+        now: "${now}"
+        origMsg: "${(skill.userQuestion)!''}"
+        history: "${(skill.questionAnswerHistory)!''}"
+        langName: "${(skill.userLangName)!'English'}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0
+      maxTokens: 1024
+      resultVariable: "leaveLLMResponse"
+      standardActions: ""
+      promptTemplate: "You are a friendly HR assistant helping an employee submit a leave request.\n\nToday's date is ${now}.\n\n============================\nLANGUAGE — ALREADY DECIDED BY THE SYSTEM, DO NOT DETECT IT\n============================\nWrite EVERY \"message\" you produce ENTIRELY in ${langName}. Nothing else decides the language.\n- Do NOT detect, guess or infer the language from any text. Do NOT switch language mid-conversation.\n- The memory below, the examples, and these instructions contain BOTH Arabic and English. None of that affects your output language — only ${langName} does.\n- If ${langName} is Arabic, every \"message\" is 100% Arabic with no English words. If ${langName} is English, every \"message\" is 100% English with no Arabic words.\n- Only the \"message\" text is in ${langName}. All JSON keys, status values and absenceType values are ALWAYS English.\n\n============================\nORIGINAL REQUEST (context only — NOT a language signal)\n============================\n${origMsg}\n\n============================\nCURRENT COLLECTED VALUES\n============================\n- absenceType: ${absenceType}\n- startDate: ${startDate}\n- endDate: ${endDate}\n- period: ${period}\n- reason: ${reason}\n\n============================\nPREVIOUS CONVERSATION AND PAST TRANSACTIONS (memory)\n============================\n${history}\n\nUse this memory ONLY to resolve explicit references to something earlier — e.g. \"the same dates as last time\", \"extend my last leave\", \"same type as before\", \"نفس المرة الماضية\". NEVER auto-fill a field from memory unless the employee actually referred to it. If the employee asks WHAT they submitted before, that is a question about history — answer it via the offtopic route, do not start a new leave request.\n\n============================\nEMPLOYEE JUST SAID (latest input)\n============================\n${question}\n\n============================\nYOUR JOB\n============================\nExtract the leave details. Keep previously collected values unless the employee changes them. If the employee gives a correction (e.g. \"no make the end date the 16th\", \"make it 3 days\"), update ONLY the corrected field and keep the rest.\n\nabsenceType must be EXACTLY one of these English values (even if the user writes Arabic):\n- Annual Leave (إجازة سنوية)\n- Sick Leave (إجازة مرضية)\n- Emergency Leave (إجازة طارئة)\n- Birth of New Child (إجازة وضع)\n- Death Vacation (إجازة وفاة)\n- Examination Leave (إجازة اختبار)\n- Hajj Vacation (إجازة حج)\n- Hours Leave (إذن خروج / إذن ساعات)\n- Marriage Vacation (إجازة زواج)\n- Remote Working (عمل عن بعد)\n\nDATES: YYYY-MM-DD. Convert relative dates (today, tomorrow, next Monday, in 3 days, بكره, الأسبوع الجاي) using today's date. If only one date or a single day is given, set endDate = startDate. If the user gives a number of days N, set endDate = startDate + (N - 1). If the user says the end should be 'after N days' / 'N days later', set endDate = startDate + N.\n\nHOURS LEAVE: if absenceType is \"Hours Leave\" you MUST also collect period, exactly one of \"Morning - صباحا\" or \"Evening - مساء\" (morning/صباحا/الصباح -> Morning - صباحا ; evening/مساء/المساء/بعد الظهر -> Evening - مساء). Set endDate = startDate. For every OTHER leave type, period MUST be an empty string \"\".\n\nSICK LEAVE: if absenceType is \"Sick Leave\" you MUST also collect reason, exactly one of: Arthritis, Contagious illness, Diarrhea, Flu, General Allergies, General Injuries, Headache, High Fever, Illness that negatively impacts productivity, Indigestion, Other, Sinusitis, Surgery, Torn ligament, Vomiting. Map descriptions: cold->Flu, stomach ache->Indigestion, صداع->Headache, حرارة->High Fever, استفراغ->Vomiting, حساسية->General Allergies, اسهال->Diarrhea, عملية->Surgery. If nothing matches, use Other. Do NOT include reason for any other leave type. The attachment is handled by the flow — NEVER ask for an attachment.\n\n============================\nSTATUS\n============================\nRequired fields:\n- Regular leave (everything except Hours and Sick): absenceType + startDate + endDate.\n- Hours Leave: absenceType + startDate + endDate + period.\n- Sick Leave: absenceType + startDate + endDate + reason.\n\nCASE A - all required fields present and valid -> respond ONLY with JSON, no \"message\":\n{\"status\":\"complete\",\"absenceType\":\"...\",\"startDate\":\"YYYY-MM-DD\",\"endDate\":\"YYYY-MM-DD\"}\nHours: {\"status\":\"complete\",\"absenceType\":\"Hours Leave\",\"startDate\":\"YYYY-MM-DD\",\"endDate\":\"YYYY-MM-DD\",\"period\":\"Morning - صباحا\"}\nSick: {\"status\":\"complete\",\"absenceType\":\"Sick Leave\",\"startDate\":\"YYYY-MM-DD\",\"endDate\":\"YYYY-MM-DD\",\"reason\":\"Headache\"}\nDo NOT ask for confirmation.\n\nCASE B - something missing/invalid:\n{\"status\":\"incomplete\",\"absenceType\":\"...\",\"startDate\":\"...\",\"endDate\":\"...\",\"message\":\"short friendly question asking ONLY for the next missing thing\"}\nAsk for ONE thing at a time, in order: type, then dates, then (Hours) period / (Sick) reason. If nothing is collected yet, ask which leave type they want and for which dates — written in ${langName} (do NOT copy the English example text; express the idea in ${langName}).\n\nCASE C - gibberish/unclear:\n{\"status\":\"incomplete\",\"absenceType\":\"\",\"startDate\":\"\",\"endDate\":\"\",\"message\":\"<a short message, written in ${langName}, saying you did not catch that and asking for the leave type and dates>\"}\n\nCASE D - the employee wants to CANCEL the leave request (\"cancel\", \"stop\", \"never mind\", \"i dont want leave anymore\", \"الغاء\", \"إلغاء\", \"لا اريد\", \"خلاص\"):\n{\"status\":\"cancel\",\"absenceType\":\"\",\"startDate\":\"\",\"endDate\":\"\",\"period\":\"\",\"reason\":\"\"}\n\nCASE E - the employee's LATEST input is a DIFFERENT request entirely — not leave details and not a correction: a greeting alone (hello, مرحبا), leave balance, payslip, attendance, absence history, a policy question, bank account, business trip, personal/employment info:\n{\"status\":\"offtopic\",\"absenceType\":\"\",\"startDate\":\"\",\"endDate\":\"\",\"period\":\"\",\"reason\":\"\"}\nIMPORTANT: CHANGING or CORRECTING leave details (\"make it sick leave instead\", \"no, next Thursday\", \"بدل الصباح المساء\") is NEVER cancel or offtopic — update the value and continue. An EXPLANATION with extra context (\"I'm sick so I need tomorrow off\") is NOT offtopic — extract the useful values from it and continue.\n\n============================\nRULES\n============================\n- Respond with JSON ONLY. No text before or after.\n- status is one of: complete, incomplete, cancel, offtopic.\n- The employee may explain or add context instead of answering directly — always extract whatever leave details are present and continue.\n- Never ask the user to confirm; the flow handles confirmation.\n- absenceType must be the exact English value from the list, or empty.\n- The \"message\" field must ALWAYS be written in ${langName}, on every single turn, with no exceptions and no mixing.\n- ALWAYS output all five fields every turn: absenceType, startDate, endDate, period, reason. Echo the values you already have; use \"\" for any field that is empty or not applicable to the chosen type. Never ask for attachments."
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment, please..."
+    transitions:
+      next: "cleanLeaveJson"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        outOfScopeKeyword: false
+        enableStreaming: false
+        userPrompt: true
+        outOfScopeMessage: true
+        enableMultiTurn: false
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        promptTemplate: true
+        eventHandler: false
+        retryUserMessage: true
+        llmService: false
+  cleanLeaveJson:
+    component: "System.SetVariable"
+    properties:
+      variable: "leaveLLMResponse"
+      value: "${\"{\" + (leaveLLMResponse?keep_after(\"{\"))?keep_before_last(\"}\") + \"}\"}"
+    transitions:
+      next: "setAbsenceType"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  setAbsenceType:
+    component: "System.SetVariable"
+    properties:
+      variable: "absenceType"
+      value: "${((leaveLLMResponse?eval_json.absenceType)!(absenceType!''))?replace('<not set>','')}"
+    transitions:
+      next: "setStartDate"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  setStartDate:
+    component: "System.SetVariable"
+    properties:
+      variable: "startDate"
+      value: "${((leaveLLMResponse?eval_json.startDate)!(startDate!''))?replace('<not set>','')}"
+    transitions:
+      next: "setEndDate"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  setEndDate:
+    component: "System.SetVariable"
+    properties:
+      variable: "endDate"
+      value: "${((leaveLLMResponse?eval_json.endDate)!(endDate!''))?replace('<not set>','')}"
+    transitions:
+      next: "setPeriod"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  setPeriod:
+    component: "System.SetVariable"
+    properties:
+      variable: "period"
+      value: "${((leaveLLMResponse?eval_json.period)!(period!''))?replace('<not set>','')}"
+    transitions:
+      next: "setReason"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  setReason:
+    component: "System.SetVariable"
+    properties:
+      variable: "reason"
+      value: "${((leaveLLMResponse?eval_json.reason)!(reason!''))?replace('<not set>','')}"
+    transitions:
+      next: "setLeaveStatus"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  setLeaveStatus:
+    component: "System.SetVariable"
+    properties:
+      variable: "leaveStatus"
+      value: "${((leaveLLMResponse?eval_json.status)!'incomplete')?trim?lower_case}"
+    transitions:
+      next: "switchStatus"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  switchStatus:
+    component: "System.Switch"
+    properties:
+      variable: "leaveStatus"
+    transitions:
+      actions:
+        incomplete: "clearQuestion"
+        complete: "routeByType"
+        cancel: "presentCancelled"
+        offtopic: "rerouteToLoop"
+      next: "clearQuestion"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        source: true
+        requiresAuthorization: false
+  clearQuestion:
+    component: "System.ResetVariables"
+    properties:
+      variableList: "skill.question"
+    transitions:
+      next: "question"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variableList: false
+        requiresAuthorization: false
+  question:
+    component: "System.CommonResponse"
+    properties:
+      variable: "skill.question"
+      processUserMessage: true
+      prompt: "${(leaveLLMResponse?eval_json.message)!((((skill.userLang)!'en') == 'ar')?then('أي نوع إجازة تريد، وفي أي تواريخ؟','Which type of leave would you like, and for which dates?'))}"
+    transitions:
+      next: "invokeLeaveLLM"
+    metadata:
+      virtualComponent: "Virtual.Question"
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        prompt: true
+        requiresAuthorization: false
+  routeByType:
+    component: "System.Switch"
+    properties:
+      source: "${((absenceType!'')?lower_case?contains('sick'))?then('SICK','OTHER')}"
+    transitions:
+      actions:
+        SICK: "sickHasAttachment"
+      next: "buildSummary"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        source: true
+        requiresAuthorization: false
+  sickHasAttachment:
+    component: "System.Switch"
+    properties:
+      source: "${((sickAttachment!'')?length gt 0)?then('HAVE','NEED')}"
+    transitions:
+      actions:
+        HAVE: "buildSummary"
+        NEED: "initSickAttRetry"
+      next: "initSickAttRetry"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        source: true
+        requiresAuthorization: false
+  initSickAttRetry:
+    component: "System.SetVariable"
+    properties:
+      variable: "sickAttRetry"
+      value: "0"
+    transitions:
+      next: "presentAskAttachment"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  presentAskAttachment:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        langName: "${(skill.userLangName)!'English'}"
+        absenceType: "${((absenceType)!'')?replace('<not set>','')}"
+        startDate: "${((startDate)!'')?replace('<not set>','')}"
+        endDate: "${((endDate)!'')?replace('<not set>','')}"
+        errorReason: "${((errorReason)!'')?replace('<not set>','')}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0
+      maxTokens: 256
+      resultVariable: "askMsg"
+      standardActions: ""
+      promptTemplate: "Write ONE short message asking the employee to attach their medical certificate (a PDF or image) using the attachment / paperclip button, because it is required to submit a sick leave request.\n\nLANGUAGE — write the message ENTIRELY in ${langName}. The language is already decided by the system: do NOT detect it, guess it, or mix languages. If ${langName} is Arabic the message is 100% Arabic; if ${langName} is English it is 100% English.\n\nOutput ONLY the message text, no quotes, no labels."
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment, please..."
+    transitions:
+      next: "askAttachment"
+    metadata: "id001"
+  askAttachment:
+    component: "System.CommonResponse"
+    properties:
+      metadata:
+        responseItems:
+        - text: "${askMsg}"
+          type: "text"
+      keepTurn: true
+    transitions:
+      next: "waitAttachment"
+    metadata:
+      virtualComponent: "Virtual.Output"
+      propertySheetIsFreeMarkerMap:
+        requiresAuthorization: false
+  waitAttachment:
+    component: "System.CommonResponse"
+    properties:
+      maxPrompts: 1
+      variable: "sickAttachment"
+      processUserMessage: true
+      keepTurn: false
+      prompt: "📎"
+    transitions:
+      next: "captureAttachment"
+    metadata:
+      virtualComponent: "Virtual.Question"
+      propertySheetIsFreeMarkerMap:
+        maxPrompts: false
+        variable: false
+        processUserMessage: false
+        keepTurn: false
+        prompt: true
+        requiresAuthorization: false
+  captureAttachment:
+    component: "System.SetVariable"
+    properties:
+      variable: "sickAttachment"
+      value: "${(system.message.messagePayload.attachment.url)!(system.message.messagePayload.attachments[0].url)!(system.message.messagePayload.attachments[0].contentUrl)!(system.message.messagePayload.channelExtensions.attachment.url)!(system.message.messagePayload.channelExtensions.attachments[0].contentUrl)!((((sickAttachment)!'')?lower_case?starts_with('http'))?then((sickAttachment)!'',''))}"
+    transitions:
+      next: "captureAttFileName"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  captureAttFileName:
+    component: "System.SetVariable"
+    properties:
+      variable: "sickAttFileName"
+      value: "${(system.message.messagePayload.attachment.title)!(system.message.messagePayload.attachments[0].title)!(system.message.messagePayload.attachments[0].fileName)!'Medical_Certificate'}"
+    transitions:
+      next: "incrementSickAttRetry"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  incrementSickAttRetry:
+    component: "System.SetVariable"
+    properties:
+      variable: "sickAttRetry"
+      value: "${((sickAttRetry!'0')?number + 1)?c}"
+    transitions:
+      next: "validateAttachment"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  validateAttachment:
+    component: "System.Switch"
+    properties:
+      source: "${((sickAttachment!'')?lower_case?starts_with('http'))?then('OK',((sickAttRetry!'0')?number gte 2)?then('GIVEUP','MISSING'))}"
+    transitions:
+      actions:
+        OK: "buildSummary"
+        MISSING: "presentAskAttachment"
+        GIVEUP: "presentAttachFailed"
+      next: "presentAttachFailed"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        source: true
+        requiresAuthorization: false
+  presentAttachFailed:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        langName: "${(skill.userLangName)!'English'}"
+        absenceType: "${((absenceType)!'')?replace('<not set>','')}"
+        startDate: "${((startDate)!'')?replace('<not set>','')}"
+        endDate: "${((endDate)!'')?replace('<not set>','')}"
+        errorReason: "${((errorReason)!'')?replace('<not set>','')}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0
+      maxTokens: 256
+      resultVariable: "noticeMsg"
+      standardActions: ""
+      promptTemplate: "Write ONE short message explaining that the attached file could not be read, that a medical certificate is required for a sick leave request, and that they should try again later or email the certificate to HR.\n\nLANGUAGE — write the message ENTIRELY in ${langName}. The language is already decided by the system: do NOT detect it, guess it, or mix languages. If ${langName} is Arabic the message is 100% Arabic; if ${langName} is English it is 100% English.\n\nOutput ONLY the message text, no quotes, no labels."
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment, please..."
+    transitions:
+      next: "showNotice"
+    metadata: "id002"
+  buildSummary:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        langName: "${(skill.userLangName)!'English'}"
+        absenceType: "${((absenceType)!'')?replace('<not set>','')}"
+        startDate: "${((startDate)!'')?replace('<not set>','')}"
+        endDate: "${((endDate)!'')?replace('<not set>','')}"
+        period: "${((period)!'')?replace('<not set>','')}"
+        reason: "${((reason)!'')?replace('<not set>','')}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0
+      maxTokens: 256
+      resultVariable: "confirmPrompt"
+      standardActions: ""
+      promptTemplate: "You are a friendly HR assistant. Write a SHORT confirmation message for the employee's leave request. List the details, then end by asking whether to submit it (a clear yes/no question).\n\nLANGUAGE — write the whole message ENTIRELY in ${langName}. The language is already decided by the system: do NOT detect it, guess it, or mix languages. If ${langName} is Arabic the message is 100% Arabic; if ${langName} is English it is 100% English.\n\nLeave details:\n- Type: ${absenceType}\n- Start date: ${startDate}\n- End date: ${endDate}\n- Period: ${period}\n- Reason: ${reason}\n\nRules:\n- Include the Period line ONLY if Period is non-empty. Include the Reason line ONLY if Reason is non-empty.\n- Keep dates exactly as given (YYYY-MM-DD). Do NOT invent any value.\n- One short message, then the submit yes/no question.\n- Output ONLY the message text. No quotes, no labels, no JSON."
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment, please..."
+    transitions:
+      actions:
+        error: "clearConfirmReply"
+      next: "clearConfirmReply"
+    metadata: "id003"
+  clearConfirmReply:
+    component: "System.ResetVariables"
+    properties:
+      variableList: "confirmReply,confirmResult"
+    transitions:
+      next: "confirmSummary"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variableList: false
+        requiresAuthorization: false
+  confirmSummary:
+    component: "System.CommonResponse"
+    properties:
+      variable: "confirmReply"
+      processUserMessage: true
+      prompt: "${confirmPrompt}"
+    transitions:
+      next: "classifyConfirm"
+    metadata:
+      virtualComponent: "Virtual.Question"
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        prompt: true
+        requiresAuthorization: false
+  classifyConfirm:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        confirmReply: "${((confirmReply)!'')?replace('<not set>','')}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0
+      maxTokens: 8
+      resultVariable: "confirmResult"
+      standardActions: ""
+      promptTemplate: "The employee was shown a leave request summary and asked to confirm submitting it. Classify their reply into EXACTLY one word: YES, NO, or EDIT.\n\n- YES: a clear affirmative with NO change requested (yes, yeah, sure, ok, go ahead, confirm, submit, do it, نعم, ايوه, تمام, موافق, أكد, أرسل, قدم, oui, si).\n- EDIT: the employee wants to CHANGE or CORRECT a detail, or gives new/different information (a date, a leave type, a period, a reason, a duration) - EVEN IF the message starts with 'no'. Examples: 'no, make it 3 days', 'no end date should be after three days', 'change the end date to Thursday', 'actually next Tuesday', 'make it sick leave instead', 'evening not morning', 'لا خلها 3 ايام', 'غير تاريخ النهاية', 'بدل الصباح المساء'.\n- NO: a pure cancel/refusal with NO new detail (no, nope, cancel, stop, never mind, forget it, لا, إلغاء, الغاء, كنسل, مو الحين).\n\nIf the reply contains ANY concrete detail (a date, a number, a leave type, a period, a reason), choose EDIT, not NO. Only choose NO for a bare negative with nothing else.\n\nEmployee reply: \"${confirmReply}\"\n\nOutput EXACTLY one word: YES, NO, or EDIT."
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment, please..."
+    transitions:
+      next: "switchConfirm"
+    metadata: "id004"
+  switchConfirm:
+    component: "System.Switch"
+    properties:
+      source: "${(confirmResult!'')?upper_case?contains('EDIT')?then('EDIT',(confirmResult!'')?upper_case?contains('YES')?then('YES','NO'))}"
+    transitions:
+      actions:
+        EDIT: "applyEdit"
+        "YES": "routeLeaveAPI"
+        "NO": "presentCancelled"
+      next: "presentCancelled"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        source: true
+        requiresAuthorization: false
+  rerouteToLoop:
+    component: "System.InvokeFlow"
+    properties:
+      inputParameters:
+      - name: "lastTool"
+        value: "init"
+      - name: "lastToolResult"
+        value: "none"
+      flow: "loopFlow"
+      outputParameters: []
+    transitions: {}
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        flow: false
+  applyEdit:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.question"
+      value: "${(confirmReply!'')?replace('<not set>','')}"
+    transitions:
+      next: "invokeLeaveLLM"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  routeLeaveAPI:
+    component: "System.Switch"
+    properties:
+      source: "${((absenceType!'')?lower_case?contains('hours'))?then('HOURS',((absenceType!'')?lower_case?contains('sick'))?then('SICK','REGULAR'))}"
+    transitions:
+      actions:
+        HOURS: "callHoursLeaveAPI"
+        SICK: "sickFinalGate"
+      next: "callRegularLeaveAPI"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        source: true
+        requiresAuthorization: false
+  sickFinalGate:
+    component: "System.Switch"
+    properties:
+      source: "${((sickAttachment!'')?length gt 0)?then('OK','MISSING')}"
+    transitions:
+      actions:
+        OK: "callSickLeaveAPI"
+        MISSING: "initSickAttRetry"
+      next: "initSickAttRetry"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        source: true
+        requiresAuthorization: false
+  callRegularLeaveAPI:
+    component: "System.CallRestService"
+    properties:
+      authConfigType: "basicAuth"
+      restService: "SUBMITLEAVE"
+      endpoint: "https://aljent-oic-jed-prod01-lrwl7ouc1vb3-je.integration.me-jeddah-1.ocp.oraclecloud.com/ic/api/integration/v1/flows/rest/EMP_LEAVE_SUBMIT_INT/1.0/leaveRequest"
+      responseConfig: "apiResponse"
+      requestHeaders: []
+      method: "POST"
+      requestBody: "{\n   \"personID\": \"${(profile.properties.value.personId)!''}\",\n    \"email\": \"${(profile.email)!''}\",\n    \"absenceType\": \"${absenceType}\",\n    \"startDate\": \"${startDate}\",\n    \"endDate\": \"${endDate}\",\n    \"absenceStatusCd\": \"SUBMITTED\"\n}"
+      requestParameters: []
+      resultVariable: "LeaveAPIResponse"
+    transitions:
+      actions:
+        error: "extractErrorReason"
+      next: "setLeaveSubmitResult"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        authConfigType: false
+        restService: false
+        endpoint: false
+        responseConfig: false
+        method: false
+        requestBody: true
+        apiKeyValueVariable: false
+        passwordVariable: false
+        tokenVariable: false
+        resultVariable: false
+        requiresAuthorization: false
+  callHoursLeaveAPI:
+    component: "System.CallRestService"
+    properties:
+      authConfigType: "basicAuth"
+      restService: "HoursLeaveSubmit"
+      endpoint: "https://aljent-oic-jed-prod01-lrwl7ouc1vb3-je.integration.me-jeddah-1.ocp.oraclecloud.com/ic/api/integration/v1/flows/rest/EMP_LEAVE_HOURS_SUBMIT_INT/1.0/leaveRequest"
+      responseConfig: "apiResponse"
+      requestHeaders: []
+      method: "POST"
+      requestBody: "{\n    \"personID\": \"${(profile.properties.value.personId)!''}\",\n    \"email\": \"${(profile.email)!''}\",\n    \"absenceType\": \"Hours Leave\",\n    \"startDate\": \"${startDate}\",\n    \"endDate\": \"${startDate}\",\n    \"HoursLeaveTime\": \"${period}\",\n    \"absenceStatusCd\": \"SUBMITTED\"\n}"
+      requestParameters: []
+      resultVariable: "LeaveAPIResponse"
+    transitions:
+      actions:
+        error: "extractErrorReason"
+      next: "setLeaveSubmitResult"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        authConfigType: false
+        restService: false
+        endpoint: false
+        responseConfig: false
+        method: false
+        requestBody: true
+        apiKeyValueVariable: false
+        passwordVariable: false
+        tokenVariable: false
+        resultVariable: false
+        requiresAuthorization: false
+  callSickLeaveAPI:
+    component: "System.CallRestService"
+    properties:
+      authConfigType: "basicAuth"
+      restService: "SubmitSickLeave"
+      endpoint: "https://aljent-oic-jed-prod01-lrwl7ouc1vb3-je.integration.me-jeddah-1.ocp.oraclecloud.com/ic/api/integration/v1/flows/rest/EMP_LEAVE_SICK_SUBMIT_INT/1.0/leaveRequest"
+      responseConfig: "apiResponse"
+      requestHeaders: []
+      method: "POST"
+      requestBody: "{\n    \"personID\": \"${(profile.properties.value.personId)!''}\",\n    \"email\": \"${(profile.email)!''}\",\n    \"absenceType\": \"Sick Leave\",\n    \"startDate\": \"${startDate}\",\n    \"endDate\": \"${endDate}\",\n    \"absenceStatusCd\": \"SUBMITTED\",\n    \"sickLeaveReason\": \"${(reason)!''}\",\n    \"attachmentURL\": \"${((sickAttachment)!'')?json_string}\",\n    \"FileName\": \"${((sickAttFileName)!'Medical_Certificate')?json_string}\",\n    \"attachmentTitle\": \"${((sickAttFileName)!'Medical_Certificate')?json_string}\"\n}"
+      requestParameters: []
+      resultVariable: "LeaveAPIResponse"
+    transitions:
+      actions:
+        error: "extractErrorReason"
+      next: "setLeaveSubmitResult"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        authConfigType: false
+        restService: false
+        endpoint: false
+        responseConfig: false
+        method: false
+        requestBody: true
+        apiKeyValueVariable: false
+        passwordVariable: false
+        tokenVariable: false
+        resultVariable: false
+        requiresAuthorization: false
+  setLeaveSubmitResult:
+    component: "System.SetVariable"
+    properties:
+      variable: "leaveSubmitResult"
+      value: "${((((LeaveAPIResponse.value.statusCode)!(LeaveAPIResponse.statusCode)!'')?string)?starts_with('4'))?then('error',((((LeaveAPIResponse.value.statusCode)!(LeaveAPIResponse.statusCode)!'')?string)?starts_with('5'))?then('error',((LeaveAPIResponse?string)?lower_case?contains('errorreason'))?then('error',((LeaveAPIResponse?string)?contains('\"Status\":\"4'))?then('error',((LeaveAPIResponse?string)?contains('\"Status\":\"5'))?then('error','201')))))}"
+    transitions:
+      next: "extractErrorReason"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  extractErrorReason:
+    component: "System.SetVariable"
+    properties:
+      variable: "errorReason"
+      value: "${((LeaveAPIResponse?string)!'')?contains('\"ErrorReason\":\"')?then(((LeaveAPIResponse?string)!'')?keep_after('\"ErrorReason\":\"')?keep_before('\"'),'Please contact HR for details.')}"
+    transitions:
+      next: "checkResponse"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  checkResponse:
+    component: "System.Switch"
+    properties:
+      variable: "leaveSubmitResult"
+    transitions:
+      actions:
+        "201": "presentSuccess"
+      next: "presentError"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        source: true
+        requiresAuthorization: false
+  presentSuccess:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        langName: "${(skill.userLangName)!'English'}"
+        absenceType: "${((absenceType)!'')?replace('<not set>','')}"
+        startDate: "${((startDate)!'')?replace('<not set>','')}"
+        endDate: "${((endDate)!'')?replace('<not set>','')}"
+        errorReason: "${((errorReason)!'')?replace('<not set>','')}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0
+      maxTokens: 256
+      resultVariable: "noticeMsg"
+      standardActions: ""
+      promptTemplate: "Write ONE short, friendly message confirming that the employee's ${absenceType} request from ${startDate} to ${endDate} was submitted successfully, and that they will receive a confirmation email once it is approved.\n\nLANGUAGE — write the message ENTIRELY in ${langName}. The language is already decided by the system: do NOT detect it, guess it, or mix languages. If ${langName} is Arabic the message is 100% Arabic; if ${langName} is English it is 100% English.\n\nOutput ONLY the message text, no quotes, no labels."
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment, please..."
+    transitions:
+      next: "showNotice"
+    metadata: "id005"
+  presentError:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        langName: "${(skill.userLangName)!'English'}"
+        absenceType: "${((absenceType)!'')?replace('<not set>','')}"
+        startDate: "${((startDate)!'')?replace('<not set>','')}"
+        endDate: "${((endDate)!'')?replace('<not set>','')}"
+        errorReason: "${((errorReason)!'')?replace('<not set>','')}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0
+      maxTokens: 256
+      resultVariable: "noticeMsg"
+      standardActions: ""
+      promptTemplate: "Write ONE short message telling the employee that their ${absenceType} request could NOT be submitted. Include this exact reason: ${errorReason}. Ask them to contact HR for assistance.\n\nLANGUAGE — write the message ENTIRELY in ${langName}. The language is already decided by the system: do NOT detect it, guess it, or mix languages. If ${langName} is Arabic the message is 100% Arabic; if ${langName} is English it is 100% English.\n\nOutput ONLY the message text, no quotes, no labels."
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment, please..."
+    transitions:
+      next: "showNotice"
+    metadata: "id006"
+  presentCancelled:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        langName: "${(skill.userLangName)!'English'}"
+        absenceType: "${((absenceType)!'')?replace('<not set>','')}"
+        startDate: "${((startDate)!'')?replace('<not set>','')}"
+        endDate: "${((endDate)!'')?replace('<not set>','')}"
+        errorReason: "${((errorReason)!'')?replace('<not set>','')}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0
+      maxTokens: 256
+      resultVariable: "noticeMsg"
+      standardActions: ""
+      promptTemplate: "Write ONE short, polite message saying the request has been cancelled and that the employee can start again whenever they are ready. Name the request type naturally using this value: \"${absenceType}\" (e.g. \"your Remote Working request\", \"your Annual Leave request\"). If that value is empty, just say \"your request\".\n\nLANGUAGE — write the message ENTIRELY in ${langName}. The language is already decided by the system: do NOT detect it, guess it, or mix languages. If ${langName} is Arabic the message is 100% Arabic; if ${langName} is English it is 100% English.\n\nOutput ONLY the message text, no quotes, no labels."
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment, please..."
+    transitions:
+      next: "showNotice"
+    metadata: "id007"
+  showNotice:
+    component: "System.CommonResponse"
+    properties:
+      metadata:
+        responseItems:
+        - text: "${noticeMsg}"
+          type: "text"
+      keepTurn: true
+    transitions:
+      next: "appendTxnHistory"
+    metadata:
+      virtualComponent: "Virtual.Output"
+      propertySheetIsFreeMarkerMap:
+        requiresAuthorization: false
+  appendTxnHistory:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.questionAnswerHistory"
+      value: "${(skill.questionAnswerHistory)!''}\n\n### Question\n${(skill.userQuestion)!''}\n### Transaction\nLeave request — type: ${(absenceType)!'-'}, from: ${(startDate)!'-'}, to: ${(endDate)!'-'}, period: ${(period)!'-'}, reason: ${(reason)!'-'}, apiResult: ${(leaveSubmitResult)!'not submitted'}\n### Answer\n${(noticeMsg)!''}"
+    transitions: {}
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false

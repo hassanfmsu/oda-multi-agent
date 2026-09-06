@@ -1,0 +1,399 @@
+name: "confirmFlow"
+trackingId: "AAAA0006-0000-0000-0000-000000000006"
+type: "task"
+version: "2.0"
+interface: {}
+configuration:
+  requiresAuthorization: false
+  defaultApplicationContext: false
+  privateThread: false
+defaultTransitions:
+  actions:
+    system.startTaskFlow: "resetParam"
+states:
+  translateSummary:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        summaryEn: "${(skill.autoConfirmSummary)!'Shall I proceed?'}"
+        langName: "${(skill.userLangName)!'English'}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0
+      maxTokens: 256
+      resultVariable: "skill.llmResp"
+      standardActions: ""
+      promptTemplate: "Write the English confirmation prompt below in ${langName}.\n\nEnglish confirmation: \"\"\"${summaryEn}\"\"\"\n\nLANGUAGE — ALREADY DECIDED BY THE SYSTEM, DO NOT DETECT IT:\n- If ${langName} is English → output the English prompt UNCHANGED, character for character.\n- Otherwise → translate it naturally and completely into ${langName}, with no English words left in it.\n- Do NOT detect or guess the language from any text. Never mix languages.\n- Keep dates (YYYY-MM-DD) unchanged; end with the yes/no equivalent of \"Submit?\" in ${langName}.\n\nOutput ONLY the result. No quotes, no labels, no explanation.\n\nExample when ${langName} is English:\n\"Annual Leave on 2026-05-11. Submit?\" → Annual Leave on 2026-05-11. Submit?\nExample when ${langName} is Arabic:\n\"Annual Leave on 2026-05-11. Submit?\" → إجازة سنوية في 2026-05-11. هل أقدمها؟\n\nOutput:"
+      undoButtonLabel: "Undo"
+      retryUserMessage: "..."
+    transitions:
+      actions:
+        error: "useEnglishSummary"
+      next: "askConfirm"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  returnToLoop:
+    component: "System.InvokeFlow"
+    properties:
+      inputParameters:
+      - name: "lastTool"
+        value: "confirm"
+      - name: "lastToolResult"
+        value: "User confirmation reply (raw text — interpret yes/no/نعم/لا/أيوه/تأكيد yourself): \"${skill.parameterResponse}\". Summary that was confirmed: ${(skill.autoConfirmSummary)!''}"
+      flow: "loopFlow"
+      outputParameters: []
+    transitions: {}
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        flow: false
+  classifyConfirmReply:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        userReply: "${(skill.parameterResponse)!''}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0
+      maxTokens: 8
+      resultVariable: "skill.llmResp"
+      standardActions: "SUBMIT,CANCEL,UNDO"
+      promptTemplate: "Classify the user's reply as one of three labels: YES, NO, or UNKNOWN.\n\nUser reply: \"${userReply}\"\n\nRules:\n- YES: any affirmative in any language (yes, ok, sure, do it, submit, proceed, نعم, أيوه, تمام, أكد, موافق, أرسل, قدم, oui, sí, हाँ, etc.)\n- NO: any negative or cancel in any language (no, cancel, stop, abort, never mind, لا, إلغاء, الغاء, تراجع, non, no, नहीं, etc.)\n- UNKNOWN: anything else (a question, a different request, gibberish)\n\nOutput EXACTLY one word: YES, NO, or UNKNOWN. No punctuation, no explanation."
+      undoButtonLabel: "Undo"
+      retryUserMessage: "..."
+    transitions:
+      actions:
+        error: "returnToLoop"
+      next: "routeConfirmReply"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  useEnglishCancel:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.llmResp"
+      value: "Your leave request has been cancelled. Is there anything else I can help you with?"
+    transitions:
+      next: "outputConfirmCancelled"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  pickSummary:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        previousAutoSummary: "${(skill.autoConfirmSummary)!''}"
+        reason: "${(skill.filled_reason)!''}"
+        supervisorSummary: "${(user.tool.value.summary)!''}"
+        period: "${(skill.filled_period)!''}"
+        validaty: "${(skill.filled_validaty)!''}"
+        endDate: "${(skill.filled_endDate)!''}"
+        toDate: "${(skill.filled_toDate)!''}"
+        absenceType: "${(skill.filled_absenceType)!''}"
+        periodDays: "${(skill.filled_periodDays)!''}"
+        startDate: "${(skill.filled_startDate)!''}"
+        visaType: "${(skill.filled_visaType)!''}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0
+      maxTokens: 160
+      resultVariable: "skill.autoConfirmSummary"
+      standardActions: ""
+      promptTemplate: "Build a ONE-LINE English confirmation summary for an HR submission. The line MUST end with 'Submit?'. Output ONLY the summary line — no quotes, no preamble, no labels, no explanation.\n\nFILLED VALUES (ignore any empty value):\n- absenceType: ${absenceType}\n- startDate: ${startDate}\n- endDate: ${endDate}\n- period: ${period}\n- reason: ${reason}\n- visaType: ${visaType}\n- validaty: ${validaty}\n- toDate: ${toDate}\n- periodDays: ${periodDays}\n- supervisorSummary: ${supervisorSummary}\n- previousAutoSummary: ${previousAutoSummary}\n\nRULES — follow in order:\n\n1. LEAVE submission — if absenceType is non-empty AND startDate is non-empty AND endDate is non-empty:\n   - Start with the exact absenceType value.\n   - If startDate == endDate → append ' on <startDate>'\n   - Else → append ' from <startDate> to <endDate>'\n   - If period is non-empty → append ' (<period>)'\n   - If reason is non-empty → append ' — reason: <reason>'\n   - End with '. Submit?'\n\n2. VISA submission — else if visaType is non-empty:\n   - Start with the exact visaType value.\n   - If validaty is non-empty → append ' valid on <validaty>'\n   - If toDate is non-empty → append ' until <toDate>'\n   - If periodDays is non-empty → append ' (<periodDays> days)'\n   - End with '. Submit?'\n\n3. Else if supervisorSummary is non-empty → output it verbatim. If it does not already end with '?' append ' Submit?'.\n\n4. Else if previousAutoSummary is non-empty → output it verbatim.\n\n5. Else output exactly: Shall I proceed?\n\nABSOLUTE RULES:\n- Use ONLY the values shown above. NEVER invent dates, leave types, or any other field.\n- Keep dates in YYYY-MM-DD format exactly as given.\n- Do not translate (the next step handles translation).\n- One line only. No newlines.\n\nOutput:"
+      undoButtonLabel: "Undo"
+      retryUserMessage: "..."
+    transitions:
+      actions:
+        error: "fallbackPickSummary"
+      next: "translateSummary"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  useEnglishSummary:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.llmResp"
+      value: "${(skill.autoConfirmSummary)!'Shall I proceed?'}"
+    transitions:
+      next: "askConfirm"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  resetParam:
+    component: "System.ResetVariables"
+    properties:
+      variableList: "skill.parameterResponse,skill.llmResp"
+    transitions:
+      next: "pickSummary"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variableList: false
+        requiresAuthorization: false
+  invokeSubmitLeave:
+    component: "System.InvokeFlow"
+    properties:
+      inputParameters: []
+      flow: "submitLeaveAgent"
+      outputParameters: []
+    transitions: {}
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        flow: false
+  translateCancelMessage:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        summaryEn: "Your leave request has been cancelled. Is there anything else I can help you with?"
+        langName: "${(skill.userLangName)!'English'}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0
+      maxTokens: 128
+      resultVariable: "skill.llmResp"
+      standardActions: "SUBMIT,CANCEL,UNDO"
+      promptTemplate: "Write the English text below in ${langName}.\n\nText: \"${summaryEn}\"\n\nLANGUAGE — ALREADY DECIDED BY THE SYSTEM, DO NOT DETECT IT:\n- If ${langName} is English → output the text UNCHANGED.\n- Otherwise → translate it completely into ${langName}, leaving no English words.\n- Do NOT detect or guess the language from any text. Never mix languages.\n\nOutput ONLY the result. No quotes."
+      undoButtonLabel: "Undo"
+      retryUserMessage: "..."
+    transitions:
+      actions:
+        error: "useEnglishCancel"
+      next: "outputConfirmCancelled"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  resetAfterConfirmCancel:
+    component: "System.ResetVariables"
+    properties:
+      variableList: "skill.filled_absenceType,skill.filled_startDate,skill.filled_endDate,skill.filled_period,skill.filled_reason,skill.filled_visaType,skill.filled_validaty,skill.filled_toDate,skill.filled_periodDays,skill.filled_traficViolation,skill.filled_paidFee,skill.filled_floats,skill.filled_activeVisa,skill.filled_iqamaExpiry,skill.filled_confirmation,skill.autoConfirmSummary,skill.preExtractResponse"
+    transitions:
+      next: "translateCancelMessage"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variableList: false
+        requiresAuthorization: false
+  fallbackPickSummary:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.autoConfirmSummary"
+      value: "${(user.tool.value.summary)!(skill.autoConfirmSummary)!'Shall I proceed?'}"
+    transitions:
+      next: "translateSummary"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  invokeSubmitVisa:
+    component: "System.InvokeFlow"
+    properties:
+      inputParameters: []
+      flow: "submitExitReentryAgent"
+      outputParameters: []
+    transitions: {}
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        flow: false
+  outputConfirmCancelled:
+    component: "System.CommonResponse"
+    properties:
+      metadata:
+        responseItems:
+        - text: "${skill.llmResp}"
+          type: "text"
+      keepTurn: true
+    transitions: {}
+    metadata:
+      virtualComponent: "Virtual.Output"
+      propertySheetIsFreeMarkerMap:
+        requiresAuthorization: false
+  setFilledConfirmation:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.filled_confirmation"
+      value: "${skill.parameterResponse}"
+    transitions:
+      next: "classifyConfirmReply"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  askConfirm:
+    component: "System.CommonResponse"
+    properties:
+      variable: "skill.parameterResponse"
+      processUserMessage: true
+      prompt: "${skill.llmResp}"
+    transitions:
+      next: "setFilledConfirmation"
+    metadata:
+      virtualComponent: "Virtual.Question"
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        prompt: true
+        requiresAuthorization: false
+  routeConfirmReply:
+    component: "System.Switch"
+    properties:
+      source: "${(skill.llmResp!'UNKNOWN')?upper_case}"
+    transitions:
+      actions:
+        "NO": "resetAfterConfirmCancel"
+        "YES": "routeToSubmit"
+        UNKNOWN: "returnToLoop"
+      next: "returnToLoop"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        source: true
+        requiresAuthorization: false
+  routeToSubmit:
+    component: "System.Switch"
+    properties:
+      source: "${((skill.filled_absenceType!'')?length gt 0)?then('LEAVE',((skill.filled_visaType!'')?length gt 0)?then('VISA','LEAVE'))}"
+    transitions:
+      actions:
+        LEAVE: "invokeSubmitLeave"
+        VISA: "invokeSubmitVisa"
+      next: "invokeSubmitLeave"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        source: true
+        requiresAuthorization: false

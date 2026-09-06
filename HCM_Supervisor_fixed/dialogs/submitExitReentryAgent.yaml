@@ -1,0 +1,1272 @@
+name: "submitExitReentryAgent"
+trackingId: "AAAA000F-0000-0000-0000-00000000000F"
+type: "task"
+version: "2.0"
+interface: {}
+configuration:
+  requiresAuthorization: false
+  defaultApplicationContext: false
+  privateThread: false
+variables:
+- name: "langCode"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "questionsJson"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "visaType"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "visaTypeClass"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "toDate"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "validaty"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "periodDays"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "traficViolation"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "traficClass"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "paidFee"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "feeClass"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "iqamaExpiry"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "iqamaClass"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "visaTypeReply"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "toDateReply"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "normalizedDate"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "traficReply"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "feeReply"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "iqamaReply"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "submitResult"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "VisaAPIResponse"
+  type: "map"
+  metadata:
+    isFreeMarker: false
+  system: false
+- name: "errorReason"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "now"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "confirmReply"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "confirmResult"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "summaryEn"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "summaryMsg"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "outMsgEn"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "outMsg"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+defaultTransitions:
+  actions:
+    system.startTaskFlow: "resetVariables"
+states:
+  resetVariables:
+    component: "System.ResetVariables"
+    properties:
+      variableList: "langCode,questionsJson,visaType,visaTypeClass,toDate,validaty,periodDays,traficViolation,traficClass,paidFee,feeClass,iqamaExpiry,iqamaClass,visaTypeReply,toDateReply,normalizedDate,traficReply,feeReply,iqamaReply,submitResult,VisaAPIResponse,errorReason,confirmReply,confirmResult,summaryEn,summaryMsg,outMsgEn,outMsg"
+    transitions:
+      next: "setNow"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variableList: false
+        requiresAuthorization: false
+  setNow:
+    component: "System.SetVariable"
+    properties:
+      variable: "now"
+      value: "${.now?string('yyyy-MM-dd')}"
+    transitions:
+      next: "setValidaty"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  setValidaty:
+    component: "System.SetVariable"
+    properties:
+      variable: "validaty"
+      value: "${.now?string('yyyy-MM-dd')}"
+    transitions:
+      next: "detectLang"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  detectLang:
+    component: "System.SetVariable"
+    properties:
+      variable: "langCode"
+      value: "${(skill.userLang)!'en'}"
+    transitions:
+      next: "normalizeLang"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  normalizeLang:
+    component: "System.SetVariable"
+    properties:
+      variable: "langCode"
+      value: "${((((langCode!'')?trim?lower_case)?length) gt 1)?then(((langCode!'')?trim?lower_case)?substring(0,2),'en')}"
+    transitions:
+      next: "renderQuestions"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  renderQuestions:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        targetLang: "${(langCode)!'en'}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0
+      maxTokens: 800
+      resultVariable: "questionsJson"
+      standardActions: ""
+      promptTemplate: "You prepare the wording of the questions an HR assistant will ask an employee about an exit / re-entry visa request.\n\nWrite every question in the language identified by the two-letter ISO 639-1 code given under TARGET LANGUAGE.\n\nRules:\n- If TARGET LANGUAGE is en, copy the English texts below EXACTLY as they are, unchanged.\n- Otherwise translate each text naturally and politely into that language.\n- Keep the two option names One Visit and multiple visit in English exactly as written, in every language.\n- Keep the list numbering 1. and 2. and keep the example date 2026-09-09 unchanged.\n- Keep every line break shown in the English texts.\n- Respond with a JSON object ONLY, with exactly these six keys and no others: visaType, date, badDate, trafic, fee, iqama. No markdown, no code fences, no commentary.\n\nTARGET LANGUAGE\n${targetLang}\n\nENGLISH TEXTS\nvisaType: Which type of exit re-entry visa do you need?\\n1. One Visit\\n2. multiple visit\\nReply with 1 or 2, or type the name.\ndate: What is the visa end date, meaning your return date? You can write a date like 2026-09-09, or say something like after one month.\nbadDate: That return date is not after today. Please give the visa end date again, for example 2026-09-09.\ntrafic: Please confirm that you do not have any unpaid traffic violations. Answer Yes to confirm, or No if you do have violations.\nfee: Have you paid the exit re-entry visa fee? Please answer Yes or No.\niqama: Is your iqama valid and not expiring during this trip? Please answer Yes or No.\n\nJSON"
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment, please..."
+    transitions:
+      actions:
+        error: "setQuestionsFallback"
+      next: "cleanQuestionsJson"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  setQuestionsFallback:
+    component: "System.SetVariable"
+    properties:
+      variable: "questionsJson"
+      value: "{}"
+    transitions:
+      next: "clearVisaTypeReply"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: false
+        requiresAuthorization: false
+  cleanQuestionsJson:
+    component: "System.SetVariable"
+    properties:
+      variable: "questionsJson"
+      value: "${\"{\" + ((questionsJson!'{}')?keep_after(\"{\"))?keep_before_last(\"}\") + \"}\"}"
+    transitions:
+      next: "clearVisaTypeReply"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  clearVisaTypeReply:
+    component: "System.ResetVariables"
+    properties:
+      variableList: "visaTypeReply,visaTypeClass"
+    transitions:
+      next: "askVisaType"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variableList: false
+        requiresAuthorization: false
+  askVisaType:
+    component: "System.CommonResponse"
+    properties:
+      variable: "visaTypeReply"
+      processUserMessage: true
+      prompt: "${((questionsJson?eval_json.visaType)!((((skill.userLang)!'en') == 'ar')?then('أي نوع من تأشيرة الخروج والعودة تحتاج؟ 1. One Visit  2. multiple visit','Which type of exit re-entry visa do you need? 1. One Visit  2. multiple visit')))}"
+    transitions:
+      next: "classifyVisaType"
+    metadata:
+      virtualComponent: "Virtual.Question"
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        prompt: true
+        requiresAuthorization: false
+  classifyVisaType:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        reply: "${((visaTypeReply)!'')?replace('<not set>','')}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0
+      maxTokens: 8
+      resultVariable: "visaTypeClass"
+      standardActions: ""
+      promptTemplate: "The employee was asked which exit re-entry visa type they need: 1. One Visit or 2. multiple visit. Classify their reply into EXACTLY one word: ONE, MULTI, CANCEL, or OTHER.\n\n- ONE: they chose the One Visit option — including 1, one, one visit, single, single visit, only one, and misspellings such as oen, on visit, one vist, obe visit, and Arabic forms such as واحدة, زيارة واحدة, مرة واحدة.\n- MULTI: they chose the multiple visit option — including 2, multi, multiple, multiple visits, many visits, and misspellings such as mutliple, multple, multipl, and Arabic forms such as متعددة, زيارات متعددة.\n- CANCEL: they want to stop or abandon the request — cancel, stop, quit, never mind, forget it, and misspellings such as cancle, canacel, cansel, cancell, and Arabic forms such as الغاء, إلغاء, خلاص, ما ابي, لا اريد.\n- OTHER: anything else, including questions and unrelated text.\n\nAlways interpret a misspelled word as the word the employee most likely intended.\n\nEmployee reply\n${reply}\n\nOutput EXACTLY one word: ONE, MULTI, CANCEL, or OTHER."
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment, please..."
+    transitions:
+      actions:
+        error: "clearVisaTypeReply"
+      next: "switchVisaType"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  switchVisaType:
+    component: "System.Switch"
+    properties:
+      source: "${((visaTypeClass!'')?upper_case?contains('CANCEL'))?then('CANCEL',((visaTypeClass!'')?upper_case?contains('MULTI'))?then('MULTI',((visaTypeClass!'')?upper_case?contains('ONE'))?then('ONE','ASK')))}"
+    transitions:
+      actions:
+        ONE: "setVisaTypeOne"
+        MULTI: "setVisaTypeMulti"
+        CANCEL: "buildCancelMsgEn"
+        ASK: "clearVisaTypeReply"
+      next: "clearVisaTypeReply"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        source: true
+        requiresAuthorization: false
+  setVisaTypeOne:
+    component: "System.SetVariable"
+    properties:
+      variable: "visaType"
+      value: "One Visit"
+    transitions:
+      next: "clearToDateReply"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: false
+        requiresAuthorization: false
+  setVisaTypeMulti:
+    component: "System.SetVariable"
+    properties:
+      variable: "visaType"
+      value: "multiple visit"
+    transitions:
+      next: "clearToDateReply"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: false
+        requiresAuthorization: false
+  clearToDateReply:
+    component: "System.ResetVariables"
+    properties:
+      variableList: "toDateReply,normalizedDate"
+    transitions:
+      next: "askToDate"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variableList: false
+        requiresAuthorization: false
+  askToDate:
+    component: "System.CommonResponse"
+    properties:
+      variable: "toDateReply"
+      processUserMessage: true
+      prompt: "${((questionsJson?eval_json.date)!((((skill.userLang)!'en') == 'ar')?then('ما هو تاريخ انتهاء التأشيرة أو تاريخ العودة؟ مثال 2026-09-09.','What is the visa end date, meaning your return date? For example 2026-09-09.')))}"
+    transitions:
+      next: "normalizeDate"
+    metadata:
+      virtualComponent: "Virtual.Question"
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        prompt: true
+        requiresAuthorization: false
+  normalizeDate:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        userText: "${(toDateReply!'')?replace('<not set>','')}"
+        today: "${(now)!''}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0
+      maxTokens: 16
+      resultVariable: "normalizedDate"
+      standardActions: ""
+      promptTemplate: "Convert the TEXT into a calendar date in YYYY-MM-DD format. Output ONLY the date, nothing else.\n\nRules:\n- The date is a visa end date, a return date, so it is always in the FUTURE relative to TODAY.\n- Resolve relative expressions against TODAY: after one month is TODAY plus one month, in 3 weeks is TODAY plus 21 days, tomorrow is TODAY plus 1 day, next month is TODAY plus one month.\n- Accept plain dates in any common format and convert them, for example 2026-09-09, 09/09/2026, 9 September 2026, sep 9. Accept misspelled month names such as septmber or ocotber and interpret them as the intended month.\n- Arabic examples: بعد شهر is TODAY plus one month, بعد شهرين is TODAY plus two months, بعد اسبوع is TODAY plus 7 days, بكره is TODAY plus 1 day.\n- If the TEXT says to cancel or stop the request — cancel, stop, quit, never mind, misspellings such as cancle or canacel, or Arabic الغاء, إلغاء, خلاص — output exactly: CANCEL\n- If the TEXT is not a date, not a time expression, and not a cancellation, output exactly: INVALID\n- Output ONLY the date in YYYY-MM-DD, or the single word CANCEL, or the single word INVALID. No explanation, no quotes, no extra text.\n\nTODAY\n${today}\n\nTEXT\n${userText}\n\nOUTPUT"
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment, please..."
+    transitions:
+      actions:
+        error: "clearToDateReply"
+      next: "checkDateResult"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  checkDateResult:
+    component: "System.Switch"
+    properties:
+      source: "${(((normalizedDate!'')?trim)?matches('[0-9]{4}-[0-9]{2}-[0-9]{2}'))?then('OK',(((normalizedDate!'')?upper_case)?contains('CANCEL'))?then('CANCEL','BAD'))}"
+    transitions:
+      actions:
+        OK: "setToDate"
+        CANCEL: "buildCancelMsgEn"
+        BAD: "clearToDateReply"
+      next: "clearToDateReply"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        source: true
+        requiresAuthorization: false
+  setToDate:
+    component: "System.SetVariable"
+    properties:
+      variable: "toDate"
+      value: "${(normalizedDate!'')?trim}"
+    transitions:
+      next: "computePeriod"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  computePeriod:
+    component: "System.SetVariable"
+    properties:
+      variable: "periodDays"
+      value: "${((((toDate?trim)?date('yyyy-MM-dd')?long - (validaty?trim)?date('yyyy-MM-dd')?long) / 86400000)?round)?c}"
+    transitions:
+      next: "checkPeriod"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  checkPeriod:
+    component: "System.Switch"
+    properties:
+      source: "${(((periodDays!'0')?number) gt 0)?then('OK','BAD')}"
+    transitions:
+      actions:
+        OK: "clearTraficReply"
+        BAD: "resetBadDate"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        source: true
+        requiresAuthorization: false
+  resetBadDate:
+    component: "System.ResetVariables"
+    properties:
+      variableList: "toDate,toDateReply,normalizedDate,periodDays"
+    transitions:
+      next: "askBadDate"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variableList: false
+        requiresAuthorization: false
+  askBadDate:
+    component: "System.CommonResponse"
+    properties:
+      variable: "toDateReply"
+      processUserMessage: true
+      prompt: "${((questionsJson?eval_json.badDate)!((((skill.userLang)!'en') == 'ar')?then('تاريخ العودة يجب أن يكون بعد تاريخ اليوم. يرجى إدخال التاريخ مرة أخرى، مثال 2026-09-09.','That return date is not after today. Please give the visa end date again, for example 2026-09-09.')))}"
+    transitions:
+      next: "normalizeDate"
+    metadata:
+      virtualComponent: "Virtual.Question"
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        prompt: true
+        requiresAuthorization: false
+  clearTraficReply:
+    component: "System.ResetVariables"
+    properties:
+      variableList: "traficReply,traficClass"
+    transitions:
+      next: "askTrafic"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variableList: false
+        requiresAuthorization: false
+  askTrafic:
+    component: "System.CommonResponse"
+    properties:
+      variable: "traficReply"
+      processUserMessage: true
+      prompt: "${((questionsJson?eval_json.trafic)!((((skill.userLang)!'en') == 'ar')?then('يرجى التأكيد بأنه لا توجد عليك مخالفات مرورية غير مدفوعة. أجب بنعم للتأكيد.','Please confirm that you do not have any unpaid traffic violations. Answer Yes to confirm.')))}"
+    transitions:
+      next: "classifyTrafic"
+    metadata:
+      virtualComponent: "Virtual.Question"
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        prompt: true
+        requiresAuthorization: false
+  classifyTrafic:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        reply: "${((traficReply)!'')?replace('<not set>','')}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0
+      maxTokens: 8
+      resultVariable: "traficClass"
+      standardActions: ""
+      promptTemplate: "The employee was asked to CONFIRM that they do NOT have any unpaid traffic violations. Classify their reply into EXACTLY one word: YES, NO, CANCEL, or OTHER.\n\n- YES: they CONFIRM they have no violations — yes, y, ya, yeah, yep, sure, ok, confirm, i confirm, correct, right, no violations, i do not have any, and typos such as yse, yess, yed, and Arabic forms such as نعم, ايوه, اي, تمام, اكيد, أؤكد, ما عندي, ما عندي مخالفات, لا يوجد, لا توجد.\n- NO: they say they DO have violations or cannot confirm — no, i have violations, i have some, yes i have violations, not yet paid, and Arabic forms such as عندي مخالفات, عليّ مخالفات, لا استطيع التأكيد.\n- CANCEL: they want to stop or abandon the whole request — cancel, stop, quit, never mind, forget it, and misspellings such as cancle, canacel, cansel, and Arabic forms such as الغاء, إلغاء, خلاص, ما ابي.\n- OTHER: anything else, including questions and unrelated text.\n\nA plain no with nothing else means they cannot confirm, so classify it as NO. Always interpret a misspelled word as the word the employee most likely intended.\n\nEmployee reply\n${reply}\n\nOutput EXACTLY one word: YES, NO, CANCEL, or OTHER."
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment, please..."
+    transitions:
+      actions:
+        error: "clearTraficReply"
+      next: "switchTrafic"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  switchTrafic:
+    component: "System.Switch"
+    properties:
+      source: "${((traficClass!'')?upper_case?contains('CANCEL'))?then('CANCEL',((traficClass!'')?upper_case?contains('YES'))?then('SET',((traficClass!'')?upper_case?contains('NO'))?then('SET','ASK')))}"
+    transitions:
+      actions:
+        SET: "setTraficViolation"
+        CANCEL: "buildCancelMsgEn"
+        ASK: "clearTraficReply"
+      next: "clearTraficReply"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        source: true
+        requiresAuthorization: false
+  setTraficViolation:
+    component: "System.SetVariable"
+    properties:
+      variable: "traficViolation"
+      value: "${((traficClass!'')?upper_case?contains('YES'))?then('Yes','No')}"
+    transitions:
+      next: "clearFeeReply"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  clearFeeReply:
+    component: "System.ResetVariables"
+    properties:
+      variableList: "feeReply,feeClass"
+    transitions:
+      next: "askFee"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variableList: false
+        requiresAuthorization: false
+  askFee:
+    component: "System.CommonResponse"
+    properties:
+      variable: "feeReply"
+      processUserMessage: true
+      prompt: "${((questionsJson?eval_json.fee)!((((skill.userLang)!'en') == 'ar')?then('هل قمت بدفع رسوم تأشيرة الخروج والعودة؟ يرجى الإجابة بنعم أو لا.','Have you paid the exit re-entry visa fee? Please answer Yes or No.')))}"
+    transitions:
+      next: "classifyFee"
+    metadata:
+      virtualComponent: "Virtual.Question"
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        prompt: true
+        requiresAuthorization: false
+  classifyFee:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        reply: "${((feeReply)!'')?replace('<not set>','')}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0
+      maxTokens: 8
+      resultVariable: "feeClass"
+      standardActions: ""
+      promptTemplate: "The employee was asked a yes-or-no question: Have you paid the exit re-entry visa fee? Classify their reply into EXACTLY one word: YES, NO, CANCEL, or OTHER.\n\n- YES: any affirmative in any language, including misspellings — yes, y, ya, yeah, yep, sure, ok, paid, i paid, and typos such as yse, yess, yed, and Arabic forms such as نعم, ايوه, اي, تمام, اكيد, دفعت.\n- NO: any negative in any language, including misspellings — no, n, nope, not yet, and typos such as noo, nno, and Arabic forms such as لا, لأ, لسه, لم ادفع, ما دفعت.\n- CANCEL: they want to stop or abandon the whole request — cancel, stop, quit, never mind, forget it, and misspellings such as cancle, canacel, cansel, and Arabic forms such as الغاء, إلغاء, خلاص, ما ابي.\n- OTHER: anything else, including questions and unrelated text.\n\nAlways interpret a misspelled word as the word the employee most likely intended.\n\nEmployee reply\n${reply}\n\nOutput EXACTLY one word: YES, NO, CANCEL, or OTHER."
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment, please..."
+    transitions:
+      actions:
+        error: "clearFeeReply"
+      next: "switchFee"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  switchFee:
+    component: "System.Switch"
+    properties:
+      source: "${((feeClass!'')?upper_case?contains('CANCEL'))?then('CANCEL',((feeClass!'')?upper_case?contains('YES'))?then('SET',((feeClass!'')?upper_case?contains('NO'))?then('SET','ASK')))}"
+    transitions:
+      actions:
+        SET: "setPaidFee"
+        CANCEL: "buildCancelMsgEn"
+        ASK: "clearFeeReply"
+      next: "clearFeeReply"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        source: true
+        requiresAuthorization: false
+  setPaidFee:
+    component: "System.SetVariable"
+    properties:
+      variable: "paidFee"
+      value: "${((feeClass!'')?upper_case?contains('YES'))?then('Yes','No')}"
+    transitions:
+      next: "clearIqamaReply"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  clearIqamaReply:
+    component: "System.ResetVariables"
+    properties:
+      variableList: "iqamaReply,iqamaClass"
+    transitions:
+      next: "askIqama"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variableList: false
+        requiresAuthorization: false
+  askIqama:
+    component: "System.CommonResponse"
+    properties:
+      variable: "iqamaReply"
+      processUserMessage: true
+      prompt: "${((questionsJson?eval_json.iqama)!((((skill.userLang)!'en') == 'ar')?then('هل الإقامة سارية ولا تنتهي خلال هذه الرحلة؟ يرجى الإجابة بنعم أو لا.','Is your iqama valid and not expiring during this trip? Please answer Yes or No.')))}"
+    transitions:
+      next: "classifyIqama"
+    metadata:
+      virtualComponent: "Virtual.Question"
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        prompt: true
+        requiresAuthorization: false
+  classifyIqama:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        reply: "${((iqamaReply)!'')?replace('<not set>','')}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0
+      maxTokens: 8
+      resultVariable: "iqamaClass"
+      standardActions: ""
+      promptTemplate: "The employee was asked a yes-or-no question: Is your iqama valid and not expiring during this trip? Classify their reply into EXACTLY one word: YES, NO, CANCEL, or OTHER.\n\n- YES: any affirmative in any language, including misspellings — yes, y, ya, yeah, yep, sure, ok, valid, and typos such as yse, yess, yed, and Arabic forms such as نعم, ايوه, اي, تمام, اكيد, سارية.\n- NO: any negative in any language, including misspellings — no, n, nope, expired, expiring, and typos such as noo, nno, and Arabic forms such as لا, لأ, منتهية, تنتهي قريبا.\n- CANCEL: they want to stop or abandon the whole request — cancel, stop, quit, never mind, forget it, and misspellings such as cancle, canacel, cansel, and Arabic forms such as الغاء, إلغاء, خلاص, ما ابي.\n- OTHER: anything else, including questions and unrelated text.\n\nAlways interpret a misspelled word as the word the employee most likely intended.\n\nEmployee reply\n${reply}\n\nOutput EXACTLY one word: YES, NO, CANCEL, or OTHER."
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment, please..."
+    transitions:
+      actions:
+        error: "clearIqamaReply"
+      next: "switchIqama"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  switchIqama:
+    component: "System.Switch"
+    properties:
+      source: "${((iqamaClass!'')?upper_case?contains('CANCEL'))?then('CANCEL',((iqamaClass!'')?upper_case?contains('YES'))?then('SET',((iqamaClass!'')?upper_case?contains('NO'))?then('SET','ASK')))}"
+    transitions:
+      actions:
+        SET: "setIqamaExpiry"
+        CANCEL: "buildCancelMsgEn"
+        ASK: "clearIqamaReply"
+      next: "clearIqamaReply"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        source: true
+        requiresAuthorization: false
+  setIqamaExpiry:
+    component: "System.SetVariable"
+    properties:
+      variable: "iqamaExpiry"
+      value: "${((iqamaClass!'')?upper_case?contains('YES'))?then('Yes','No')}"
+    transitions:
+      next: "clearConfirmReply"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  clearConfirmReply:
+    component: "System.ResetVariables"
+    properties:
+      variableList: "confirmReply,confirmResult,summaryMsg"
+    transitions:
+      next: "buildSummaryEn"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variableList: false
+        requiresAuthorization: false
+  buildSummaryEn:
+    component: "System.SetVariable"
+    properties:
+      variable: "summaryEn"
+      value: "Please confirm your Exit / Re-entry visa request:\n🛂 Visa type: ${(visaType)!'-'}\n📅 Valid from ${(validaty)!'-'} until ${(toDate)!'-'} (${(periodDays)!'-'} days)\n🚗 No unpaid traffic violations: ${(traficViolation)!'-'}\n💳 Visa fee paid: ${(paidFee)!'-'}\n🪪 Iqama valid: ${(iqamaExpiry)!'-'}\nShall I submit it?"
+    transitions:
+      next: "renderSummary"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  renderSummary:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        targetLang: "${(langCode)!'en'}"
+        textEn: "${(summaryEn)!''}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0
+      maxTokens: 500
+      resultVariable: "summaryMsg"
+      standardActions: ""
+      promptTemplate: "Write the TEXT below in the language identified by the two-letter ISO 639-1 code given under TARGET LANGUAGE.\n\nRules:\n- If TARGET LANGUAGE is en, output the TEXT completely unchanged.\n- Otherwise translate it naturally into that language.\n- Keep every emoji, every line break and every date exactly as they are.\n- Keep the values One Visit and multiple visit in English, unchanged.\n- Keep the final line as a question asking whether to submit the request.\n- Output ONLY the resulting text. No quotes, no labels, no explanation, no extra sentences.\n\nTARGET LANGUAGE\n${targetLang}\n\nTEXT\n${textEn}\n\nOUTPUT"
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment, please..."
+    transitions:
+      actions:
+        error: "fallbackSummary"
+      next: "confirmSummary"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  fallbackSummary:
+    component: "System.SetVariable"
+    properties:
+      variable: "summaryMsg"
+      value: "${(summaryEn)!'Shall I submit your Exit / Re-entry visa request?'}"
+    transitions:
+      next: "confirmSummary"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  confirmSummary:
+    component: "System.CommonResponse"
+    properties:
+      variable: "confirmReply"
+      processUserMessage: true
+      prompt: "${(summaryMsg)!(summaryEn)!'Shall I submit your Exit / Re-entry visa request?'}"
+    transitions:
+      next: "classifyConfirm"
+    metadata:
+      virtualComponent: "Virtual.Question"
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        prompt: true
+        requiresAuthorization: false
+  classifyConfirm:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        confirmReply: "${((confirmReply)!'')?replace('<not set>','')}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0
+      maxTokens: 8
+      resultVariable: "confirmResult"
+      standardActions: ""
+      promptTemplate: "The employee was shown a request summary and asked to confirm submitting it. Classify their reply into EXACTLY one word: YES, NO, or EDIT.\n\n- YES: a clear affirmative with NO change requested — yes, yeah, sure, ok, go ahead, confirm, submit, do it, and misspellings such as yse, yess, submti, and Arabic forms such as نعم, ايوه, اي, أكيد, تمام, موافق, ارسل, ماشي.\n- EDIT: the employee wants to CHANGE or CORRECT a detail, or gives new or different information, EVEN IF the message starts with no. Examples: no make it multiple visit, change the date to next month, actually I do have violations, لا خلها متعددة, غير التاريخ.\n- NO: a pure cancel or refusal with NO new detail — no, nope, cancel, stop, never mind, and misspellings such as cancle, canacel, and Arabic forms such as لا, إلغاء, الغاء, كنسل, توقف.\n\nAlways interpret a misspelled word as the word the employee most likely intended. If the reply contains ANY concrete detail, choose EDIT, not NO.\n\nEmployee reply\n${confirmReply}\n\nOutput EXACTLY one word: YES, NO, or EDIT."
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment, please..."
+    transitions:
+      actions:
+        error: "switchConfirm"
+      next: "switchConfirm"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  switchConfirm:
+    component: "System.Switch"
+    properties:
+      source: "${((confirmResult!'')?upper_case?contains('EDIT'))?then('EDIT',((confirmResult!'')?upper_case?contains('YES'))?then('YES','NO'))}"
+    transitions:
+      actions:
+        EDIT: "clearAllForEdit"
+        "YES": "callExitReentryAPI"
+        "NO": "buildCancelMsgEn"
+      next: "buildCancelMsgEn"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        source: true
+        requiresAuthorization: false
+  clearAllForEdit:
+    component: "System.ResetVariables"
+    properties:
+      variableList: "visaType,visaTypeClass,toDate,periodDays,traficViolation,traficClass,paidFee,feeClass,iqamaExpiry,iqamaClass,visaTypeReply,toDateReply,normalizedDate,traficReply,feeReply,iqamaReply,confirmReply,confirmResult,summaryEn,summaryMsg"
+    transitions:
+      next: "clearVisaTypeReply"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variableList: false
+        requiresAuthorization: false
+  callExitReentryAPI:
+    component: "System.CallRestService"
+    properties:
+      authConfigType: "basicAuth"
+      restService: "ExitReEnteryRequest"
+      endpoint: "https://aljent-oic-jed-prod01-lrwl7ouc1vb3-je.integration.me-jeddah-1.ocp.oraclecloud.com/ic/api/integration/v1/flows/rest/EXIT_ENTRY_APPROV_SUBMIS_INT/1.0/submitExitEntry"
+      responseConfig: "apiResponse"
+      requestHeaders: []
+      method: "POST"
+      requestBody: "{\n    \"personID\": \"${(profile.properties.value.personId)!''}\",\n    \"email\": \"${(profile.email)!''}\",\n    \"Comments\": \"Primary travel document\",\n    \"documentRecordsDFF\": [\n        {\n            \"validaty\": \"${(validaty)!''}\",\n            \"toDate\": \"${(toDate)!''}\",\n            \"period\": \"${(periodDays)!''}\",\n            \"visaType\": \"${(visaType)!''}\",\n            \"traficViolation\": \"${(traficViolation)!'No'}\",\n            \"paidFee\": \"${(paidFee)!'Yes'}\",\n            \"floats\": \"Yes\",\n            \"activeVisa\": \"Yes\",\n            \"iqamaExpiry\": \"${(iqamaExpiry)!'Yes'}\"\n        }\n    ]\n}"
+      requestParameters: []
+      resultVariable: "VisaAPIResponse"
+    transitions:
+      actions:
+        error: "setServiceError"
+      next: "setSubmitResult"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        authConfigType: false
+        restService: false
+        endpoint: false
+        responseConfig: false
+        method: false
+        requestBody: true
+        apiKeyValueVariable: false
+        passwordVariable: false
+        tokenVariable: false
+        resultVariable: false
+        requiresAuthorization: false
+  setServiceError:
+    component: "System.SetVariable"
+    properties:
+      variable: "errorReason"
+      value: "The submission service is temporarily unavailable. Please try again in a few minutes."
+    transitions:
+      next: "buildErrorMsgEn"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  setSubmitResult:
+    component: "System.SetVariable"
+    properties:
+      variable: "submitResult"
+      value: "${((((VisaAPIResponse.value.statusCode)!(VisaAPIResponse.statusCode)!'')?string)?starts_with('4'))?then('FAIL',((((VisaAPIResponse.value.statusCode)!(VisaAPIResponse.statusCode)!'')?string)?starts_with('5'))?then('FAIL',((VisaAPIResponse?string)?lower_case?contains('errorreason'))?then('FAIL',((VisaAPIResponse?string)?contains('\"Status\":\"4'))?then('FAIL',((VisaAPIResponse?string)?contains('\"Status\":\"5'))?then('FAIL','OK')))))}"
+    transitions:
+      next: "extractErrorReason"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  extractErrorReason:
+    component: "System.SetVariable"
+    properties:
+      variable: "errorReason"
+      value: "${((VisaAPIResponse?string)?contains('\"ErrorReason\":\"'))?then((VisaAPIResponse?string)?keep_after('\"ErrorReason\":\"')?keep_before('\"'),'Please contact HR for details.')}"
+    transitions:
+      next: "checkResponse"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  checkResponse:
+    component: "System.Switch"
+    properties:
+      variable: "submitResult"
+    transitions:
+      actions:
+        OK: "buildSuccessMsgEn"
+        FAIL: "buildErrorMsgEn"
+      next: "buildErrorMsgEn"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        source: true
+        requiresAuthorization: false
+  buildSuccessMsgEn:
+    component: "System.SetVariable"
+    properties:
+      variable: "outMsgEn"
+      value: "✅ Your Exit / Re-entry visa request has been submitted and is now awaiting approval.\n🛂 ${(visaType)!'-'} — from ${(validaty)!'-'} until ${(toDate)!'-'} (${(periodDays)!'-'} days)\nYou will receive a notification once it is approved."
+    transitions:
+      next: "renderOutput"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  buildErrorMsgEn:
+    component: "System.SetVariable"
+    properties:
+      variable: "outMsgEn"
+      value: "❌ Your Exit / Re-entry visa request could not be submitted.\nReason: ${(errorReason)!'Please contact HR for details.'}\nPlease contact HR for assistance."
+    transitions:
+      next: "renderOutput"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  buildCancelMsgEn:
+    component: "System.SetVariable"
+    properties:
+      variable: "outMsgEn"
+      value: "Okay, I have cancelled the Exit / Re-entry visa request. Tell me again whenever you are ready."
+    transitions:
+      next: "renderOutput"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  renderOutput:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        targetLang: "${(langCode)!'en'}"
+        textEn: "${(outMsgEn)!''}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0
+      maxTokens: 500
+      resultVariable: "outMsg"
+      standardActions: ""
+      promptTemplate: "Write the TEXT below in the language identified by the two-letter ISO 639-1 code given under TARGET LANGUAGE.\n\nRules:\n- If TARGET LANGUAGE is en, output the TEXT completely unchanged.\n- Otherwise translate it naturally into that language.\n- Keep every emoji, every line break and every date exactly as they are.\n- Keep the values One Visit and multiple visit in English, unchanged.\n- Never change the meaning. A request that is awaiting approval must NOT be described as approved or completed.\n- Output ONLY the resulting text. No quotes, no labels, no explanation, no extra sentences.\n\nTARGET LANGUAGE\n${targetLang}\n\nTEXT\n${textEn}\n\nOUTPUT"
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment, please..."
+    transitions:
+      actions:
+        error: "fallbackOutput"
+      next: "outputResult"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  fallbackOutput:
+    component: "System.SetVariable"
+    properties:
+      variable: "outMsg"
+      value: "${(outMsgEn)!'Your request has been processed.'}"
+    transitions:
+      next: "outputResult"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  outputResult:
+    component: "System.CommonResponse"
+    properties:
+      metadata:
+        responseItems:
+        - text: "${(outMsg)!(outMsgEn)!'Your request has been processed.'}"
+          type: "text"
+      keepTurn: true
+    transitions:
+      next: "appendTxnHistory"
+    metadata:
+      virtualComponent: "Virtual.Output"
+      propertySheetIsFreeMarkerMap:
+        requiresAuthorization: false
+  appendTxnHistory:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.questionAnswerHistory"
+      value: "${(skill.questionAnswerHistory)!''}\n\n### Question\n${(skill.userQuestion)!''}\n### Transaction\nExit / Re-entry visa request — type: ${(visaType)!'-'}, from: ${(validaty)!'-'}, to: ${(toDate)!'-'}, days: ${(periodDays)!'-'}, traficViolation: ${(traficViolation)!'-'}, paidFee: ${(paidFee)!'-'}, iqamaExpiry: ${(iqamaExpiry)!'-'}, apiResult: ${(submitResult)!'not submitted'}"
+    transitions: {}
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
