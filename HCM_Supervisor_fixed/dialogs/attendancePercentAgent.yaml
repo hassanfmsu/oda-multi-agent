@@ -1,0 +1,540 @@
+name: "attendancePercentAgent"
+trackingId: "AAAA0014-0000-0000-0000-000000000014"
+type: "task"
+version: "2.0"
+interface: {}
+configuration:
+  requiresAuthorization: false
+  defaultApplicationContext: false
+  privateThread: false
+variables:
+- name: "rangeLLMResponse"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "startDate"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "endDate"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "dayStatus"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "rangeStatus"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+- name: "now"
+  type: "string"
+  metadata:
+    isFreeMarker: true
+  system: false
+defaultTransitions:
+  actions:
+    system.startTaskFlow: "resetVariables"
+states:
+  resetVariables:
+    component: "System.ResetVariables"
+    properties:
+      variableList: "rangeLLMResponse,startDate,endDate,dayStatus,rangeStatus,now"
+    transitions:
+      next: "setnow"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variableList: false
+        requiresAuthorization: false
+  setnow:
+    component: "System.SetVariable"
+    properties:
+      variable: "now"
+      value: "${.now?string('yyyy-MM-dd')}"
+    transitions:
+      next: "invokeRangeLLM"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  invokeRangeLLM:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: true
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: true
+      promptTemplateParameters:
+        question: "${((skill.question)!'')?replace('<not set>','')}"
+        origMsg: "${(skill.userQuestion)!''}"
+        langName: "${(skill.userLangName)!'English'}"
+        startDate: "${((startDate)!'')?replace('<not set>','')}"
+        endDate: "${((endDate)!'')?replace('<not set>','')}"
+        now: "${now}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0
+      maxTokens: 256
+      resultVariable: "rangeLLMResponse"
+      standardActions: ""
+      promptTemplate: "You are helping an employee retrieve their ATTENDANCE PRESENCE PERCENTAGE for a date range.\n\nToday's date is ${now}.\n\n============================\nLANGUAGE — ALREADY DECIDED BY THE SYSTEM, DO NOT DETECT IT\n============================\nWrite every \"message\" ENTIRELY in ${langName}, on every turn. Do NOT detect, guess or switch the language, and do NOT infer it from any text below — the examples and the memory contain both Arabic and English, and none of that affects your output. If ${langName} is Arabic every \"message\" is 100% Arabic; if ${langName} is English every \"message\" is 100% English. Never copy example text verbatim — express the idea in ${langName}. All JSON keys and status values are ALWAYS English.\n\n============================\nORIGINAL REQUEST (context only — NOT a language signal)\n============================\n${origMsg}\n\n============================\nCURRENT COLLECTED VALUES\n============================\n- startDate: ${startDate}\n- endDate: ${endDate}\n\n============================\nEMPLOYEE JUST SAID (latest input)\n============================\n${question}\n\n============================\nYOUR JOB\n============================\nDetermine the DATE RANGE (startDate and endDate, both YYYY-MM-DD) the employee wants their attendance percentage for.\n\nRULES:\n- The employee MUST specify a period. If they ask for their attendance percentage WITHOUT naming any period → output status incomplete with a message asking for the period. NEVER assume or default a period yourself.\n- A month name alone (\"december\", \"ديسمبر\"): if it is the CURRENT month → 1st of the month to today. If a past month this year → full month. If that month has not started yet this year → the same month of the PREVIOUS year (full month).\n- \"last month\" / \"الشهر الماضي\" → full previous calendar month.\n- \"this month\" / \"هذا الشهر\" → 1st of the current month to today.\n- \"last week\" / \"الأسبوع الماضي\" → the previous 7 days ending today.\n- \"last N weeks\" / \"اخر N اسابيع\" → today minus N*7 days to today. \"last N days\" / \"اخر N ايام\" → today minus N days to today. \"last N months\" / \"اخر N شهور\" (N up to 3) → today minus N months to today.\n- \"this quarter\" / \"الربع الحالي\" → first day of the current calendar quarter to today.\n- \"from X to Y\" → the given range. If only a start is given (\"since december\") → endDate = today.\n- Accept English and Arabic month names and numeric forms (\"12/2025\").\n- endDate must never be after today — cap it at today.\n- MAXIMUM RANGE: 3 months. If the employee asks for a longer range (\"this year\", \"last 6 months\", \"من بداية السنة\"), output status incomplete with a message (in their language) explaining the attendance percentage can be calculated for up to 3 months at a time, and asking which period they want.\n- Keep previously collected values unless the employee changes them.\n\n============================\nSTATUS\n============================\nCASE A — range determined:\n{\"status\":\"complete\",\"startDate\":\"YYYY-MM-DD\",\"endDate\":\"YYYY-MM-DD\"}\nNo \"message\" field. Do NOT ask for confirmation.\n\nCASE B — no period mentioned, the period is unclear, or the range is longer than 3 months:\n{\"status\":\"incomplete\",\"startDate\":\"\",\"endDate\":\"\",\"message\":\"<ONE short friendly question, written in ${langName}, asking which period they want their attendance percentage for, e.g. a month like August, last month, this quarter, or a date range>\"}\n\nCASE C — the employee wants to CANCEL (\"cancel\", \"stop\", \"never mind\", \"الغاء\", \"إلغاء\", \"لا اريد\", \"خلاص\"):\n{\"status\":\"cancel\",\"startDate\":\"\",\"endDate\":\"\"}\n\nCASE D — the employee's LATEST input is a DIFFERENT request entirely — not a period and not about this attendance percentage: a greeting (hello, مرحبا), leave balance, payslip, submitting a leave, absence history, the attendance check-in/check-out records themselves, a policy question, personal/employment info, or anything else off-topic:\n{\"status\":\"offtopic\",\"startDate\":\"\",\"endDate\":\"\"}\nIMPORTANT: a message that repeats the SAME attendance-percentage request but still without a period (e.g. \"my attendance percentage\", \"نسبة حضوري\") is CASE B (ask again), NOT offtopic.\n\n============================\nEXAMPLES (assume today = 2026-09-13)\n============================\n\"what is my attendance percentage this month\" → {\"status\":\"complete\",\"startDate\":\"2026-09-01\",\"endDate\":\"2026-09-13\"}\n\"my presence percentage for august\" → {\"status\":\"complete\",\"startDate\":\"2026-08-01\",\"endDate\":\"2026-08-31\"}\n\"attendance percentage last month\" → {\"status\":\"complete\",\"startDate\":\"2026-08-01\",\"endDate\":\"2026-08-31\"}\n\"how much did i attend in the last 3 months\" → {\"status\":\"complete\",\"startDate\":\"2026-06-13\",\"endDate\":\"2026-09-13\"}\n\"نسبة حضوري لشهر اغسطس\" → {\"status\":\"complete\",\"startDate\":\"2026-08-01\",\"endDate\":\"2026-08-31\"}\n\"نسبة الحضور هذا الشهر\" → {\"status\":\"complete\",\"startDate\":\"2026-09-01\",\"endDate\":\"2026-09-13\"}\n\"my attendance percentage from 1 july to 15 august\" → {\"status\":\"complete\",\"startDate\":\"2026-07-01\",\"endDate\":\"2026-08-15\"}\n\"what is my attendance percentage\" → {\"status\":\"incomplete\",\"startDate\":\"\",\"endDate\":\"\",\"message\":\"Sure — which period would you like your attendance percentage for? You can say a month like August, last month, this quarter, or a date range.\"}\n\"نسبة حضوري\" → {\"status\":\"incomplete\",\"startDate\":\"\",\"endDate\":\"\",\"message\":\"أكيد — لأي فترة تريد نسبة الحضور؟ يمكنك قول شهر معين، الشهر الماضي، الربع الحالي، أو فترة محددة.\"}\n\"my attendance percentage this year\" → {\"status\":\"incomplete\",\"startDate\":\"\",\"endDate\":\"\",\"message\":\"I can calculate the attendance percentage for up to 3 months at a time — which period would you like?\"}\n\"cancel\" → {\"status\":\"cancel\",\"startDate\":\"\",\"endDate\":\"\"}\n\"الغاء\" → {\"status\":\"cancel\",\"startDate\":\"\",\"endDate\":\"\"}\n\"hello\" → {\"status\":\"offtopic\",\"startDate\":\"\",\"endDate\":\"\"}\n\"what is my leave balance\" → {\"status\":\"offtopic\",\"startDate\":\"\",\"endDate\":\"\"}\n\"show my check in and check out times\" → {\"status\":\"offtopic\",\"startDate\":\"\",\"endDate\":\"\"}\n\n============================\nRULES\n============================\n- Respond with JSON ONLY. No text before or after.\n- ALWAYS output all three fields: status, startDate, endDate (use \"\" when unknown). status is one of: complete, incomplete, cancel, offtopic.\n- The \"message\" field must be written in ${langName}."
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment, please..."
+    transitions:
+      next: "cleanRangeJson"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        outOfScopeKeyword: false
+        enableStreaming: false
+        userPrompt: true
+        outOfScopeMessage: true
+        enableMultiTurn: false
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        promptTemplate: true
+        eventHandler: false
+        retryUserMessage: true
+        llmService: false
+  cleanRangeJson:
+    component: "System.SetVariable"
+    properties:
+      variable: "rangeLLMResponse"
+      value: "${\"{\" + (rangeLLMResponse?keep_after(\"{\"))?keep_before_last(\"}\") + \"}\"}"
+    transitions:
+      next: "setStartDate"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  setStartDate:
+    component: "System.SetVariable"
+    properties:
+      variable: "startDate"
+      value: "${((rangeLLMResponse?eval_json.startDate)!(startDate!''))?replace('<not set>','')}"
+    transitions:
+      next: "setEndDate"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  setEndDate:
+    component: "System.SetVariable"
+    properties:
+      variable: "endDate"
+      value: "${((rangeLLMResponse?eval_json.endDate)!(endDate!''))?replace('<not set>','')}"
+    transitions:
+      next: "setRangeStatus"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  setRangeStatus:
+    component: "System.SetVariable"
+    properties:
+      variable: "rangeStatus"
+      value: "${(rangeLLMResponse?eval_json.status)!'incomplete'}"
+    transitions:
+      next: "switchRangeStatus"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  switchRangeStatus:
+    component: "System.Switch"
+    properties:
+      variable: "rangeStatus"
+    transitions:
+      actions:
+        incomplete: "clearQuestion"
+        complete: "callPercentAPI"
+        cancel: "presentCancelled"
+        offtopic: "rerouteToLoop"
+      next: "clearQuestion"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        source: true
+        requiresAuthorization: false
+  rerouteToLoop:
+    component: "System.InvokeFlow"
+    properties:
+      inputParameters:
+      - name: "lastTool"
+        value: "init"
+      - name: "lastToolResult"
+        value: "none"
+      flow: "loopFlow"
+      outputParameters: []
+    transitions: {}
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        flow: false
+  clearQuestion:
+    component: "System.ResetVariables"
+    properties:
+      variableList: "skill.question"
+    transitions:
+      next: "question"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variableList: false
+        requiresAuthorization: false
+  question:
+    component: "System.CommonResponse"
+    properties:
+      variable: "skill.question"
+      processUserMessage: true
+      prompt: "${(rangeLLMResponse?eval_json.message)!((((skill.userLang)!'en') == 'ar')?then('لأي فترة تريد نسبة الحضور؟','For which period would you like your attendance percentage?'))}"
+    transitions:
+      next: "invokeRangeLLM"
+    metadata:
+      virtualComponent: "Virtual.Question"
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        prompt: true
+        requiresAuthorization: false
+  callPercentAPI:
+    component: "System.CallRestService"
+    properties:
+      authConfigType: "basicAuth"
+      restService: "PercentAttandanceAPI"
+      endpoint: "https://aljent-oic-jed-prod01-lrwl7ouc1vb3-je.integration.me-jeddah-1.ocp.oraclecloud.com/ic/api/integration/v1/flows/rest/EMP_PERCEN_PRESEN_REPORT_INT/1.0/GetPercentPresence/report"
+      responseConfig: "apiResponse"
+      requestHeaders: []
+      method: "GET"
+      requestParameters:
+      - type: "query"
+        value: "${(profile.properties.value.personId)!''}"
+        key: "personID"
+      - type: "query"
+        value: "${(profile.email)!''}"
+        key: "email"
+      - type: "query"
+        value: "${startDate}"
+        key: "fromDate"
+      - type: "query"
+        value: "${endDate}"
+        key: "dateTo"
+      - type: "query"
+        value: "${(dayStatus)!''}"
+        key: "dayStatus"
+      resultVariable: "skill.restResp"
+    transitions:
+      actions:
+        error: "presentServiceError"
+      next: "checkAnswered"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        authConfigType: false
+        requestParameters--Item--type: false
+        restService: false
+        endpoint: false
+        responseConfig: false
+        method: false
+        requestBody: false
+        apiKeyValueVariable: false
+        passwordVariable: false
+        tokenVariable: false
+        resultVariable: false
+        requiresAuthorization: false
+  checkAnswered:
+    component: "System.Switch"
+    properties:
+      source: "${((skill.restResp.value.statusCode!0)?number == 200)?then('OK','BAD')}"
+    transitions:
+      actions:
+        OK: "presentPercent"
+        BAD: "presentNoData"
+      next: "presentNoData"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        source: true
+        requiresAuthorization: false
+  presentPercent:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: true
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        langName: "${(skill.userLangName)!'English'}"
+        fromDate: "${(startDate)!''}"
+        toDate: "${(endDate)!''}"
+        presenceJson: "${(skill.restResp?string)!''}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0.2
+      maxTokens: 1500
+      resultVariable: "skill.finalAnswer"
+      standardActions: ""
+      promptTemplate: "You are Ameen, an HR assistant. Report the employee's ATTENDANCE PRESENCE PERCENTAGE using ONLY the data in the JSON below.\n\nLANGUAGE — ALREADY DECIDED BY THE SYSTEM, DO NOT DETECT IT:\nWrite the ENTIRE message in ${langName}. Do NOT detect or guess the language from any text, and never mix languages.\n\nRequested period: ${fromDate} to ${toDate}\n\nRAW PRESENCE SERVICE RESPONSE (JSON):\n${presenceJson}\n\nRECORD FIELDS (each record under PresenceRecords has these):\n- Date: the day in DD/MM/YYYY format (\"02/08/2026\" means 2 August 2026)\n- day: weekday name, often padded with trailing spaces — trim it\n- PercentPresence: that day's presence percentage as a string (\"100\", \"85.8\")\n- DayStatus: \"Working Day\", \"On Leave\", or another status\n- totalLateEarly: hours late or left early that day, as a string (\"0\", \"1.28\")\n\nCALCULATION — DO THIS CAREFULLY BEFORE WRITING ANYTHING:\nWork through every record in the JSON exactly once and compute:\n1. totalDays = how many records there are.\n2. overallAverage = the sum of every PercentPresence value divided by totalDays, rounded to ONE decimal place.\n3. workingDays = how many records have DayStatus \"Working Day\".\n4. workingAverage = the sum of PercentPresence for those Working Day records only, divided by workingDays, rounded to ONE decimal place. If workingDays is 0, omit the working-day line entirely.\n5. leaveDays = how many records have a DayStatus other than \"Working Day\", and which statuses they are.\n6. fullDays = how many records have PercentPresence of exactly 100.\n7. lateEarlyTotal = the sum of every totalLateEarly value, rounded to TWO decimal places.\n8. shortDays = the records whose PercentPresence is below 100, sorted oldest first.\nTreat every PercentPresence and totalLateEarly as a NUMBER even though the JSON stores it as text. Count each record once and only once — never estimate, never sample, never skip records to save effort. Every figure you print must come from this arithmetic or straight from the JSON.\n\nFORMAT — one block, in this order:\nLine 1: 📈 <the phrase \"Attendance presence\" in the employee's language> · <short period, e.g. 2 Aug → 31 Aug 2026>\n(blank line)\n<label> · <overallAverage>%            ← e.g. \"Average presence · 94.3%\"\n<label> · <workingDays> <days-word> · <label> <workingAverage>%   ← e.g. \"Working days · 20 days · average 93.7%\"\n<label> · <leaveDays> <days-word> <statuses in brackets>          ← only when leaveDays is above 0\n<label> · <fullDays> of <totalDays> <days-word>                   ← e.g. \"Full presence · 17 of 22 days\"\n<label> · <lateEarlyTotal> <hours-word>                           ← only when lateEarlyTotal is above 0\n(blank line)\n<heading for the days below full presence>\n<Weekday> <day> <Month> · <PercentPresence>% · <totalLateEarly> <hours-word>\n...one line per short day...\n(blank line)\n💡 <one or two sentences of insight>\n\nSHORT DAYS SECTION:\n- List EVERY record whose PercentPresence is below 100, oldest first — this is the detail the employee asked for.\n- If there are more than 12 such days, list the 12 with the LOWEST PercentPresence, then add one line saying how many further short days are not shown. Never silently drop rows.\n- If every day is at 100, replace the whole section with one short congratulatory line and no rows.\n- Drop the \"· <totalLateEarly> hours\" part of a row when that day's totalLateEarly is 0.\n\nDATES: convert Date (DD/MM/YYYY) plus the trimmed day into a short readable date — 3-letter weekday, day number with no leading zero, 3-letter month: \"04/08/2026\" + \"Tuesday\" → \"Tue 4 Aug\". Never print the raw DD/MM/YYYY string and never repeat the year on a row.\n\nINSIGHT — one or two sentences, factual and supportive, drawn ONLY from the numbers above. Good angles: whether the shortfall is concentrated in a few days or spread out; whether the later part of the period is better or worse than the earlier part; what the average would be if the worst day or two were full; how much of the gap the late/early hours explain. Never invent a target, a company policy, a benchmark or a consequence, never compare the employee to anyone else, and never warn, praise excessively, or give disciplinary advice.\n\n- THE ENTIRE MESSAGE MUST BE IN ${langName} — the intro line, every label, weekdays, months, statuses and the insight, all of it. English → English labels, weekdays (Sun, Mon, Tue, Wed, Thu, Fri, Sat) and months (Jan…Dec). Arabic → Arabic labels, Arabic weekdays (الأحد، الإثنين، الثلاثاء، الأربعاء، الخميس، الجمعة، السبت), Arabic months (يناير…ديسمبر) and Arabic statuses (يوم عمل، في إجازة). NEVER mix languages in one message.\n- Percentages carry ONE decimal place, and drop the \".0\" when the value is whole: 94.3%, 100%.\n- If the JSON contains NO presence records, politely say none were found for that period and suggest another period.\n- Output ONLY the message text — no JSON, no code fences, no markdown asterisks, no header row, no technical field names, no URLs."
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment please... لحظة من فضلك"
+    transitions:
+      actions:
+        error: "presenterFallback"
+      next: "outputDirect"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  presentNoData:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        langName: "${(skill.userLangName)!'English'}"
+        fromDate: "${(startDate)!''}"
+        toDate: "${(endDate)!''}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0.2
+      maxTokens: 160
+      resultVariable: "skill.finalAnswer"
+      standardActions: ""
+      promptTemplate: "Write ONE short, polite message telling the employee that no attendance records were found for the period below, so an attendance percentage cannot be calculated, and suggesting they try another period.\n\nPeriod: ${fromDate} to ${toDate}\n\nLANGUAGE — write the message ENTIRELY in ${langName}. The language is already decided by the system: do NOT detect it, guess it, or mix languages.\n\nOutput ONLY the message text, no quotes, no labels."
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment please... لحظة من فضلك"
+    transitions:
+      actions:
+        error: "presenterFallback"
+      next: "outputDirect"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  presentCancelled:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        langName: "${(skill.userLangName)!'English'}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0.2
+      maxTokens: 128
+      resultVariable: "skill.finalAnswer"
+      standardActions: ""
+      promptTemplate: "Write ONE short, polite message confirming that the attendance-percentage request has been cancelled and that you are happy to help with anything else.\n\nLANGUAGE — write the message ENTIRELY in ${langName}. The language is already decided by the system: do NOT detect it, guess it, or mix languages.\n\nOutput ONLY the message text, no quotes, no labels."
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment please... لحظة من فضلك"
+    transitions:
+      actions:
+        error: "presenterFallback"
+      next: "outputDirect"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  presentServiceError:
+    component: "System.LLM"
+    properties:
+      outOfScopeKeyword: "InvalidInput"
+      enableStreaming: false
+      enableMultiTurn: false
+      customActions: {}
+      sendResponse: false
+      addJsonSchemaInstruction: false
+      promptTemplateParameters:
+        langName: "${(skill.userLangName)!'English'}"
+      retries: 1
+      submitButtonLabel: "Submit"
+      validateJson: false
+      cancelButtonLabel: "Cancel"
+      jsonSchema: {}
+      temperature: 0.2
+      maxTokens: 128
+      resultVariable: "skill.finalAnswer"
+      standardActions: ""
+      promptTemplate: "Write ONE short, polite message telling the employee that the attendance percentage service is temporarily unavailable and to please try again in a little while.\n\nLANGUAGE — write the message ENTIRELY in ${langName}. The language is already decided by the system: do NOT detect it, guess it, or mix languages.\n\nOutput ONLY the message text, no quotes, no labels."
+      undoButtonLabel: "Undo"
+      retryUserMessage: "One moment please... لحظة من فضلك"
+    transitions:
+      actions:
+        error: "presenterFallback"
+      next: "outputDirect"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        functions: false
+        enableStreaming: false
+        outOfScopeMessage: true
+        sendResponse: false
+        addJsonSchemaInstruction: false
+        startUserMessage: true
+        cancelButtonLabel: true
+        jsonSchema: false
+        temperature: false
+        maxTokens: false
+        resultVariable: false
+        standardActions: false
+        validationEntities: false
+        undoButtonLabel: true
+        userPromptExpression: true
+        retryUserMessage: true
+        outOfScopeKeyword: false
+        userPrompt: true
+        enableMultiTurn: false
+        retries: false
+        submitButtonLabel: true
+        validateJson: false
+        promptTemplate: true
+        eventHandler: false
+        llmService: false
+  presenterFallback:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.finalAnswer"
+      value: "I could not calculate your attendance percentage right now. Please try again in a moment.\n\nلم أتمكن من حساب نسبة الحضور حالياً. يرجى المحاولة مرة أخرى بعد قليل."
+    transitions:
+      next: "outputDirect"
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
+  outputDirect:
+    component: "System.CommonResponse"
+    properties:
+      metadata:
+        responseItems:
+        - text: "${skill.finalAnswer}"
+          type: "text"
+      keepTurn: true
+    transitions:
+      next: "appendHistory"
+    metadata:
+      virtualComponent: "Virtual.Output"
+      propertySheetIsFreeMarkerMap:
+        requiresAuthorization: false
+  appendHistory:
+    component: "System.SetVariable"
+    properties:
+      variable: "skill.questionAnswerHistory"
+      value: "${(skill.questionAnswerHistory)!''}\n\n### Question\n${(skill.userQuestion)!''}\n### Answer\n${skill.finalAnswer}"
+    transitions: {}
+    metadata:
+      propertySheetIsFreeMarkerMap:
+        variable: false
+        value: true
+        requiresAuthorization: false
