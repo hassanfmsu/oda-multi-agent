@@ -1,0 +1,24 @@
+---
+import { t, localize, type Lang } from '../i18n';
+
+interface Props {
+  lang: Lang;
+  heading?: string;
+  text?: string;
+  button?: string;
+}
+
+const { lang } = Astro.props;
+const d = t(lang).home.cta;
+const { heading = d.heading, text = d.text, button = d.button } = Astro.props;
+---
+
+<section class="cta-band">
+  <div class="container cta-inner reveal">
+    <div>
+      <h2>{heading}</h2>
+      <p>{text}</p>
+    </div>
+    <a class="btn btn-primary" href={localize('/contact/', lang)}>{button}</a>
+  </div>
+</section>

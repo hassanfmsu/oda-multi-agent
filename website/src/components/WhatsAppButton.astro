@@ -1,0 +1,24 @@
+---
+import Icon from './Icon.astro';
+import { t, type Lang } from '../i18n';
+import { company } from '../site.config';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+---
+
+{company.whatsapp && (
+  <a
+    class="whatsapp-button"
+    href={`https://wa.me/${company.whatsapp}`}
+    target="_blank"
+    rel="noopener"
+    aria-label={t(lang).whatsapp}
+  >
+    <Icon name="whatsapp" />
+    <span>WhatsApp</span>
+  </a>
+)}

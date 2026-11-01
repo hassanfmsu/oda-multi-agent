@@ -1,0 +1,87 @@
+---
+import Brand from './Brand.astro';
+import { t, localize, switchLang, otherLang, languages, type Lang } from '../i18n';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const d = t(lang);
+const other = otherLang(lang);
+const path = Astro.url.pathname;
+
+const links = [
+  { href: localize('/services/', lang), label: d.nav.services },
+  { href: localize('/about/', lang), label: d.nav.about },
+  { href: localize('/contact/', lang), label: d.nav.contact },
+];
+---
+
+<header class="site-header">
+  <div class="container header-inner">
+    <Brand href={localize('/', lang)} />
+
+    <button
+      class="nav-toggle"
+      type="button"
+      aria-expanded="false"
+      aria-controls="site-nav"
+      data-open-label={d.nav.openMenu}
+      data-close-label={d.nav.closeMenu}
+    >
+      <span class="sr-only">{d.nav.openMenu}</span>
+      <span class="nav-toggle-bar" aria-hidden="true"></span>
+    </button>
+
+    <nav class="site-nav" id="site-nav" aria-label={d.nav.main}>
+      <ul>
+        {links.map((link) => (
+          <li>
+            <a href={link.href} aria-current={path.startsWith(link.href) ? 'page' : undefined}>
+              {link.label}
+            </a>
+          </li>
+        ))}
+      </ul>
+      <a class="lang-switch" href={switchLang(path, other)} lang={other} hreflang={other} title={d.nav.switchLabel}>
+        {languages[other]}
+      </a>
+      <a class="btn btn-primary btn-sm" href={localize('/contact/', lang)}>{d.nav.cta}</a>
+    </nav>
+  </div>
+</header>
+
+<script>
+  const header = document.querySelector<HTMLElement>('.site-header');
+  const toggle = document.querySelector<HTMLButtonElement>('.nav-toggle');
+  const nav = document.getElementById('site-nav');
+
+  if (header && toggle && nav) {
+    const label = toggle.querySelector('.sr-only')!;
+
+    const setOpen = (open: boolean) => {
+      toggle.setAttribute('aria-expanded', String(open));
+      label.textContent = (open ? toggle.dataset.closeLabel : toggle.dataset.openLabel) ?? '';
+      nav.classList.toggle('is-open', open);
+    };
+
+    toggle.addEventListener('click', () => setOpen(toggle.getAttribute('aria-expanded') !== 'true'));
+    nav.addEventListener('click', (e) => {
+      if ((e.target as Element).closest('a')) setOpen(false);
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && nav.classList.contains('is-open')) {
+        setOpen(false);
+        toggle.focus();
+      }
+    });
+    window.matchMedia('(min-width: 861px)').addEventListener('change', (mq) => {
+      if (mq.matches) setOpen(false);
+    });
+
+    const onScroll = () => header.classList.toggle('is-scrolled', window.scrollY > 8);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+  }
+</script>

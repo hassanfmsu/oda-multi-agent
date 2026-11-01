@@ -1,0 +1,64 @@
+---
+import Brand from './Brand.astro';
+import { t, localize, type Lang } from '../i18n';
+import { getServices, slugOf } from '../lib/services';
+import { company } from '../site.config';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const d = t(lang);
+const services = await getServices(lang);
+const columns = (['ai', 'oracle'] as const).map((pillar) => ({
+  heading: d.pillars[pillar],
+  links: services
+    .filter((s) => s.data.pillar === pillar)
+    .map((s) => ({ href: localize(`/services/${slugOf(s)}/`, lang), label: s.data.title })),
+}));
+columns.push({
+  heading: d.footer.company,
+  links: [
+    { href: localize('/about/', lang), label: d.nav.about },
+    { href: localize('/contact/', lang), label: d.nav.contact },
+    { href: localize('/privacy/', lang), label: d.footer.privacy },
+  ],
+});
+---
+
+<footer class="site-footer">
+  <div class="container footer-grid">
+    <div class="footer-brand">
+      <Brand href={localize('/', lang)} />
+      <p>{d.footer.blurb}</p>
+      {company.linkedin && (
+        <a class="footer-social" href={company.linkedin} rel="noopener" target="_blank">LinkedIn</a>
+      )}
+    </div>
+
+    {columns.map((col) => (
+      <nav class="footer-col" aria-label={col.heading}>
+        <h2>{col.heading}</h2>
+        <ul>
+          {col.links.map((link) => (
+            <li><a href={link.href}>{link.label}</a></li>
+          ))}
+        </ul>
+      </nav>
+    ))}
+  </div>
+
+  <div class="container footer-bottom">
+    <div class="footer-legal">
+      <p>&copy; {new Date().getFullYear()} {company.name}. {d.footer.rights}</p>
+      {(company.commercialRegistration || company.vatNumber) && (
+        <p>
+          {company.commercialRegistration && <span>{d.footer.cr}: <bdi>{company.commercialRegistration}</bdi></span>}
+          {company.vatNumber && <span>{d.footer.vat}: <bdi>{company.vatNumber}</bdi></span>}
+        </p>
+      )}
+    </div>
+    <p class="trademark">{d.footer.trademark}</p>
+  </div>
+</footer>

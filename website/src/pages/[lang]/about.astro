@@ -1,0 +1,45 @@
+---
+import Base from '../../layouts/Base.astro';
+import PageHero from '../../components/PageHero.astro';
+import Approach from '../../components/Approach.astro';
+import CtaBand from '../../components/CtaBand.astro';
+import { t, langPaths, type Lang } from '../../i18n';
+
+export const getStaticPaths = langPaths;
+
+const lang = Astro.params.lang as Lang;
+const a = t(lang).about;
+---
+
+<Base lang={lang} title={a.title} description={a.description}>
+  <PageHero eyebrow={a.eyebrow} heading={a.heading} lead={a.intro[0]} />
+
+  <section class="section section-soft">
+    <div class="container about-grid">
+      <figure class="name-card reveal">
+        <figcaption>{a.nameTitle}</figcaption>
+        <div class="name-mark" dir="ltr" aria-hidden="true">T<span>x</span></div>
+        <dl class="name-legend">
+          <div><dt dir="ltr">T</dt><dd>{a.nameT}</dd></div>
+          <div><dt dir="ltr">x</dt><dd>{a.nameX}</dd></div>
+        </dl>
+      </figure>
+
+      <div class="about-copy reveal">
+        <p class="about-intro">{a.intro[1]}</p>
+        <h2>{a.principlesHeading}</h2>
+        <ul class="principles">
+          {a.principles.map((p) => (
+            <li>
+              <h3>{p.title}</h3>
+              <p>{p.text}</p>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <Approach lang={lang} />
+  <CtaBand lang={lang} />
+</Base>

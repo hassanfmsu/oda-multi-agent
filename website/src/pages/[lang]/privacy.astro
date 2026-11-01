@@ -1,0 +1,39 @@
+---
+import Base from '../../layouts/Base.astro';
+import PageHero from '../../components/PageHero.astro';
+import { t, langPaths, type Lang } from '../../i18n';
+import { company } from '../../site.config';
+
+export const getStaticPaths = langPaths;
+
+const lang = Astro.params.lang as Lang;
+const p = t(lang).privacy;
+
+// TODO: have this text reviewed by a legal adviser before launch, and update it
+// if you add analytics, cookies or a form service.
+---
+
+<Base lang={lang} title={p.title} description={p.description}>
+  <PageHero eyebrow={company.name} heading={p.title} lead={p.intro} />
+
+  <section class="section">
+    <div class="container">
+      <article class="prose prose-narrow">
+        {p.sections.map((section) => {
+          const [before, after] = section.text.split('{email}');
+          return (
+            <>
+              <h2>{section.heading}</h2>
+              <p>
+                {before}
+                {after !== undefined && <a href={`mailto:${company.email}`} dir="ltr">{company.email}</a>}
+                {after}
+              </p>
+            </>
+          );
+        })}
+        <p class="updated">{p.updatedLabel}: {p.updated}</p>
+      </article>
+    </div>
+  </section>
+</Base>

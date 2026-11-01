@@ -1,0 +1,32 @@
+---
+import { t, type Lang } from '../i18n';
+
+interface Props {
+  lang: Lang;
+}
+
+const d = t(Astro.props.lang).engagement;
+---
+
+<section class="section section-soft" aria-labelledby="engagement-title">
+  <div class="container">
+    <div class="section-head reveal">
+      <p class="eyebrow">{d.eyebrow}</p>
+      <h2 id="engagement-title">{d.heading}</h2>
+      <p class="section-lead">{d.lead}</p>
+    </div>
+
+    <div class="engage-grid">
+      {d.items.map((item, i) => (
+        <article class:list={['engage-card', 'reveal', { 'engage-card-featured': i === 1 }]}>
+          <span class="engage-tag">{item.tag}</span>
+          <h3>{item.title}</h3>
+          <p>{item.text}</p>
+          <ul class="check-list">
+            {item.points.map((point) => <li>{point}</li>)}
+          </ul>
+        </article>
+      ))}
+    </div>
+  </div>
+</section>

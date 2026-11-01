@@ -1,0 +1,120 @@
+---
+import { t, localize, type Lang } from '../i18n';
+import { getServices } from '../lib/services';
+import { company } from '../site.config';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const d = t(lang).contact.form;
+const services = await getServices(lang);
+const interests = [...services.map((s) => s.data.title), d.support, d.other];
+---
+
+<!--
+  Without a server, the form opens the visitor's email app with the message
+  filled in. README.md explains how to switch to a form service later.
+-->
+<form
+  class="contact-form reveal"
+  id="contact-form"
+  novalidate
+  data-recipient={company.email}
+  data-subject={d.subject}
+  data-error={d.error}
+  data-success={d.success}
+>
+  <div class="form-row">
+    <div class="field">
+      <label for="f-name">{d.name}</label>
+      <input id="f-name" name="name" type="text" autocomplete="name" required />
+    </div>
+    <div class="field">
+      <label for="f-email">{d.email}</label>
+      <input id="f-email" name="email" type="email" autocomplete="email" dir="ltr" required />
+    </div>
+  </div>
+  <div class="form-row">
+    <div class="field">
+      <label for="f-company">{d.company}</label>
+      <input id="f-company" name="company" type="text" autocomplete="organization" />
+    </div>
+    <div class="field">
+      <label for="f-interest">{d.interest}</label>
+      <select id="f-interest" name="interest">
+        {interests.map((option) => <option>{option}</option>)}
+      </select>
+    </div>
+  </div>
+  <div class="field">
+    <label for="f-message">{d.message}</label>
+    <textarea id="f-message" name="message" rows="5" required></textarea>
+  </div>
+  <div class="field field-check">
+    <input id="f-consent" name="consent" type="checkbox" required />
+    <label for="f-consent">
+      {d.consentStart}<a href={localize('/privacy/', lang)}>{d.consentLink}</a>{d.consentEnd}
+    </label>
+  </div>
+  <button class="btn btn-primary btn-block" type="submit">{d.submit}</button>
+  <p class="form-status" role="status" aria-live="polite"></p>
+</form>
+
+<script>
+  const form = document.querySelector<HTMLFormElement>('#contact-form');
+
+  if (form) {
+    const status = form.querySelector<HTMLElement>('.form-status')!;
+    const labelFor = (name: string) =>
+      form.querySelector(`label[for="f-${name}"]`)?.textContent?.trim() ?? name;
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+
+      const invalid: HTMLInputElement[] = [];
+      form.querySelectorAll<HTMLInputElement>('[required]').forEach((input) => {
+        const ok = input.checkValidity();
+        input.closest('.field')?.classList.toggle('has-error', !ok);
+        input.setAttribute('aria-invalid', String(!ok));
+        if (!ok) invalid.push(input);
+      });
+
+      if (invalid.length) {
+        status.textContent = form.dataset.error ?? '';
+        status.classList.add('is-error');
+        invalid[0].focus();
+        return;
+      }
+
+      const data = new FormData(form);
+      const value = (name: string) => String(data.get(name) ?? '').trim();
+      const subject = `${form.dataset.subject}: ${value('interest')} (${value('company') || value('name')})`;
+      const body = [
+        `${labelFor('name')}: ${value('name')}`,
+        `${labelFor('email')}: ${value('email')}`,
+        `${labelFor('company')}: ${value('company') || '-'}`,
+        `${labelFor('interest')}: ${value('interest')}`,
+        '',
+        value('message'),
+      ].join('\n');
+
+      window.location.href =
+        `mailto:${form.dataset.recipient}` +
+        `?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+      status.classList.remove('is-error');
+      status.textContent = form.dataset.success ?? '';
+    });
+
+    form.addEventListener('input', (e) => {
+      const input = e.target as HTMLInputElement;
+      const field = input.closest('.field');
+      if (field?.classList.contains('has-error') && input.checkValidity()) {
+        field.classList.remove('has-error');
+        input.setAttribute('aria-invalid', 'false');
+      }
+    });
+  }
+</script>

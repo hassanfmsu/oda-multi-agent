@@ -1,0 +1,48 @@
+---
+import Base from '../../layouts/Base.astro';
+import ContactForm from '../../components/ContactForm.astro';
+import { t, langPaths, type Lang } from '../../i18n';
+import { company } from '../../site.config';
+
+export const getStaticPaths = langPaths;
+
+const lang = Astro.params.lang as Lang;
+const c = t(lang).contact;
+
+// Only details that are filled in src/site.config.ts are shown.
+const details = [
+  { label: c.details.email, value: company.email, href: `mailto:${company.email}`, ltr: true },
+  { label: c.details.phone, value: company.phone, href: `tel:${company.phone.replace(/[^\d+]/g, '')}`, ltr: true },
+  { label: c.details.whatsapp, value: company.whatsapp && `+${company.whatsapp}`, href: `https://wa.me/${company.whatsapp}`, ltr: true },
+  { label: c.details.linkedin, value: company.linkedin && 'LinkedIn', href: company.linkedin },
+  { label: c.details.location, value: company.address[lang] },
+  { label: c.details.hours, value: company.hours[lang] },
+].filter((item) => item.value);
+---
+
+<Base lang={lang} title={c.title} description={c.description}>
+  <section class="section section-dark contact-section">
+    <div class="container contact-grid">
+      <div class="contact-copy">
+        <p class="eyebrow eyebrow-dark">{c.eyebrow}</p>
+        <h1>{c.heading}</h1>
+        <p class="section-lead">{c.lead}</p>
+
+        <ul class="contact-details">
+          {details.map((item) => (
+            <li>
+              <span class="contact-label">{item.label}</span>
+              {item.href ? (
+                <a href={item.href} dir={item.ltr ? 'ltr' : undefined}>{item.value}</a>
+              ) : (
+                <span>{item.value}</span>
+              )}
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <ContactForm lang={lang} />
+    </div>
+  </section>
+</Base>

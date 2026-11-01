@@ -1,0 +1,147 @@
+---
+import Base from '../../layouts/Base.astro';
+import Icon from '../../components/Icon.astro';
+import Engagement from '../../components/Engagement.astro';
+import Approach from '../../components/Approach.astro';
+import CtaBand from '../../components/CtaBand.astro';
+import { t, localize, langPaths, type Lang } from '../../i18n';
+import { getServices, slugOf } from '../../lib/services';
+
+export const getStaticPaths = langPaths;
+
+const lang = Astro.params.lang as Lang;
+const d = t(lang);
+const h = d.home;
+const services = await getServices(lang);
+const pillars = (['ai', 'oracle'] as const).map((pillar) => ({
+  pillar,
+  name: d.pillars[pillar],
+  intro: h.practices[pillar],
+  services: services.filter((s) => s.data.pillar === pillar),
+}));
+---
+
+<Base lang={lang} title={h.title} description={h.description}>
+  <!-- Hero -->
+  <section class="hero">
+    <div class="container hero-grid">
+      <div class="hero-copy">
+        <p class="eyebrow eyebrow-dark">{h.eyebrow}</p>
+        <h1>{h.heading} <span class="text-accent">{h.headingAccent}</span>.</h1>
+        <p class="lead">{h.lead}</p>
+        <div class="hero-actions">
+          <a class="btn btn-primary" href={localize('/contact/', lang)}>{h.primaryCta}</a>
+          <a class="btn btn-ghost" href={localize('/services/', lang)}>{h.secondaryCta}</a>
+        </div>
+        <ul class="hero-points">
+          {h.points.map((point) => <li>{point}</li>)}
+        </ul>
+      </div>
+
+      <div class="hero-visual" aria-hidden="true">
+        <div class="stack">
+          {h.stack.map((layer, i) => (
+            <div class:list={['stack-layer', { 'layer-top': i === 0 }]}>
+              <span class="layer-label">{layer.label}</span>
+              <div class="chips">
+                {layer.chips.map((chip) => <span>{chip}</span>)}
+              </div>
+            </div>
+          ))}
+          <p class="stack-caption">{h.stackCaption}</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Platforms -->
+  <section class="platforms" aria-labelledby="platforms-title">
+    <div class="container">
+      <h2 class="platforms-title" id="platforms-title">{d.platforms.title}</h2>
+      <ul class="platform-list" dir="ltr">
+        {d.platforms.items.map((item) => <li>{item}</li>)}
+      </ul>
+    </div>
+  </section>
+
+  <!-- Two practices -->
+  <section class="section" aria-labelledby="practices-title">
+    <div class="container">
+      <div class="section-head reveal">
+        <p class="eyebrow">{h.practices.eyebrow}</p>
+        <h2 id="practices-title">{h.practices.heading}</h2>
+        <p class="section-lead">{h.practices.lead}</p>
+      </div>
+
+      <div class="pillar-grid">
+        {pillars.map((p) => (
+          <div class:list={['pillar', `pillar-${p.pillar}`, 'reveal']}>
+            <h3>{p.name}</h3>
+            <p class="pillar-intro">{p.intro}</p>
+            <ul class="pillar-list">
+              {p.services.map((s) => (
+                <li>
+                  <a href={localize(`/services/${slugOf(s)}/`, lang)}>
+                    <span class="pillar-icon"><Icon name={s.data.icon} /></span>
+                    <span>
+                      <strong>{s.data.title}</strong>
+                      <span class="pillar-summary">{s.data.summary}</span>
+                    </span>
+                    <Icon name="arrow" class="pillar-arrow flip-rtl" />
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+
+      <p class="section-more reveal">
+        <a class="text-link" href={localize('/services/', lang)}>
+          {h.practices.viewAll} <Icon name="arrow" class="flip-rtl" />
+        </a>
+      </p>
+    </div>
+  </section>
+
+  <!-- AI + Oracle together -->
+  <section class="section section-dark" aria-labelledby="together-title">
+    <div class="container split">
+      <div class="reveal">
+        <p class="eyebrow eyebrow-dark">{h.together.eyebrow}</p>
+        <h2 id="together-title">{h.together.heading}</h2>
+        <p class="section-lead">{h.together.text}</p>
+      </div>
+      <ul class="point-stack">
+        {h.together.points.map((point) => (
+          <li class="reveal">
+            <h3>{point.title}</h3>
+            <p>{point.text}</p>
+          </li>
+        ))}
+      </ul>
+    </div>
+  </section>
+
+  <!-- Region -->
+  <section class="section" aria-labelledby="region-title">
+    <div class="container">
+      <div class="section-head reveal">
+        <p class="eyebrow">{h.region.eyebrow}</p>
+        <h2 id="region-title">{h.region.heading}</h2>
+      </div>
+      <ul class="region-grid">
+        {h.region.points.map((point) => (
+          <li class="region-item reveal">
+            <h3>{point.title}</h3>
+            <p>{point.text}</p>
+          </li>
+        ))}
+      </ul>
+    </div>
+  </section>
+
+  <Engagement lang={lang} />
+  <Approach lang={lang} />
+  <CtaBand lang={lang} />
+</Base>

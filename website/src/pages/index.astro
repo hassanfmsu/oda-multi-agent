@@ -1,0 +1,30 @@
+---
+// The site lives at /en/ and /ar/. This page sends visitors to Arabic if their
+// browser prefers it, and to English otherwise.
+const en = new URL('/en/', Astro.site);
+const ar = new URL('/ar/', Astro.site);
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tx | Technology eXcellence</title>
+    <link rel="canonical" href={en} />
+    <link rel="alternate" hreflang="en" href={en} />
+    <link rel="alternate" hreflang="ar" href={ar} />
+    <link rel="alternate" hreflang="x-default" href={en} />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <script is:inline>
+      var prefersArabic = (navigator.languages || [navigator.language || '']).some(function (l) {
+        return /^ar\b/i.test(l);
+      });
+      location.replace(prefersArabic ? '/ar/' : '/en/');
+    </script>
+    <noscript><meta http-equiv="refresh" content="0; url=/en/" /></noscript>
+  </head>
+  <body>
+    <p><a href="/en/">English</a> · <a href="/ar/" lang="ar">العربية</a></p>
+  </body>
+</html>

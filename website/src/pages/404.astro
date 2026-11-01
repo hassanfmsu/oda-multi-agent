@@ -1,0 +1,26 @@
+---
+import Base from '../layouts/Base.astro';
+import { t } from '../i18n';
+
+const en = t('en').notFound;
+const ar = t('ar').notFound;
+---
+
+<Base lang="en" title={en.title} description={en.text}>
+  <section class="page-hero not-found">
+    <div class="container not-found-grid">
+      <div>
+        <p class="eyebrow eyebrow-dark">404</p>
+        <h1>{en.title}</h1>
+        <p class="lead">{en.text}</p>
+        <a class="btn btn-primary" href="/en/">{en.home}</a>
+      </div>
+      <div lang="ar" dir="rtl">
+        <p class="eyebrow eyebrow-dark">404</p>
+        <h1>{ar.title}</h1>
+        <p class="lead">{ar.text}</p>
+        <a class="btn btn-ghost" href="/ar/">{ar.home}</a>
+      </div>
+    </div>
+  </section>
+</Base>

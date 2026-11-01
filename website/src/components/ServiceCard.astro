@@ -1,0 +1,23 @@
+---
+import Icon from './Icon.astro';
+import { t, localize, type Lang } from '../i18n';
+import { slugOf, type Service } from '../lib/services';
+
+interface Props {
+  service: Service;
+  lang: Lang;
+}
+
+const { service, lang } = Astro.props;
+const { title, summary, icon, highlights } = service.data;
+---
+
+<article class="service-card reveal">
+  <div class="service-icon"><Icon name={icon} /></div>
+  <h3><a class="card-link" href={localize(`/services/${slugOf(service)}/`, lang)}>{title}</a></h3>
+  <p>{summary}</p>
+  <ul class="check-list">
+    {highlights.map((item) => <li>{item}</li>)}
+  </ul>
+  <span class="more" aria-hidden="true">{t(lang).services.learnMore} <Icon name="arrow" class="flip-rtl" /></span>
+</article>

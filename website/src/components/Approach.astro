@@ -1,0 +1,28 @@
+---
+import { t, type Lang } from '../i18n';
+
+interface Props {
+  lang: Lang;
+}
+
+const d = t(Astro.props.lang).approach;
+---
+
+<section class="section" aria-labelledby="approach-title">
+  <div class="container">
+    <div class="section-head reveal">
+      <p class="eyebrow">{d.eyebrow}</p>
+      <h2 id="approach-title">{d.heading}</h2>
+    </div>
+
+    <ol class="steps">
+      {d.steps.map((step, i) => (
+        <li class="step reveal">
+          <span class="step-num">{String(i + 1).padStart(2, '0')}</span>
+          <h3>{step.title}</h3>
+          <p>{step.text}</p>
+        </li>
+      ))}
+    </ol>
+  </div>
+</section>

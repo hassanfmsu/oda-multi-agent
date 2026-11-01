@@ -1,0 +1,14 @@
+---
+import { company } from '../site.config';
+
+interface Props {
+  href: string;
+}
+
+const { href } = Astro.props;
+---
+
+<a class="brand" href={href} aria-label={`${company.name}, ${company.tagline}`}>
+  <span class="brand-mark" aria-hidden="true">T<span>x</span></span>
+  <span class="brand-tag" aria-hidden="true">Technology<br />eXcellence</span>
+</a>

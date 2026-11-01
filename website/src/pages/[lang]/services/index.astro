@@ -1,0 +1,43 @@
+---
+import Base from '../../../layouts/Base.astro';
+import PageHero from '../../../components/PageHero.astro';
+import ServiceCard from '../../../components/ServiceCard.astro';
+import Engagement from '../../../components/Engagement.astro';
+import CtaBand from '../../../components/CtaBand.astro';
+import { t, langPaths, type Lang } from '../../../i18n';
+import { getServices } from '../../../lib/services';
+
+export const getStaticPaths = langPaths;
+
+const lang = Astro.params.lang as Lang;
+const d = t(lang);
+const s = d.services;
+const services = await getServices(lang);
+const groups = [
+  { id: 'ai', name: d.pillars.ai, lead: s.aiLead },
+  { id: 'oracle', name: d.pillars.oracle, lead: s.oracleLead },
+] as const;
+---
+
+<Base lang={lang} title={s.title} description={s.description}>
+  <PageHero eyebrow={s.eyebrow} heading={s.heading} lead={s.lead} />
+
+  {groups.map((group, i) => (
+    <section class:list={['section', { 'section-soft': i === 1 }]} id={group.id} aria-labelledby={`${group.id}-title`}>
+      <div class="container">
+        <div class="section-head reveal">
+          <h2 id={`${group.id}-title`}>{group.name}</h2>
+          <p class="section-lead">{group.lead}</p>
+        </div>
+        <div class="card-grid">
+          {services
+            .filter((service) => service.data.pillar === group.id)
+            .map((service) => <ServiceCard service={service} lang={lang} />)}
+        </div>
+      </div>
+    </section>
+  ))}
+
+  <Engagement lang={lang} />
+  <CtaBand lang={lang} />
+</Base>
