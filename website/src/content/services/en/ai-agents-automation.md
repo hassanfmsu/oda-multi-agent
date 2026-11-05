@@ -25,3 +25,5 @@ An AI agent does more than answer questions. It decides which tools to use, coll
 ## How we build them
 
 We design agents with patterns that keep them predictable: a router that picks the right specialist, a supervisor that plans across several tools, and a reflection step that checks the quality of a result before it reaches the user. Important actions always have a human approval step and a full audit trail.
+
+Agents can be built on the AI platform you prefer: OCI Generative AI, Microsoft Azure, Google Cloud, AWS or open-source models, and they work in any language your users speak.

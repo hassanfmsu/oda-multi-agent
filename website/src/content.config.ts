@@ -11,7 +11,7 @@ const services = defineCollection({
     title: z.string(),
     summary: z.string(),
     pillar: z.enum(['ai', 'oracle']),
-    icon: z.enum(['sparkle', 'agent', 'shield', 'erp', 'integration', 'paas', 'cloud', 'chat']),
+    icon: z.enum(['sparkle', 'agent', 'shield', 'data', 'erp', 'integration', 'paas', 'cloud', 'chat']),
     order: z.number(),
     highlights: z.array(z.string()).min(1),
   }),

@@ -3,7 +3,7 @@ title: Oracle Integration
 summary: اربط Fusion بالبنوك وأنظمة إدارة العملاء والمنصات الحكومية والأنظمة القديمة عبر Oracle Integration (OIC).
 pillar: oracle
 icon: integration
-order: 5
+order: 6
 highlights:
   - تكاملات REST وSOAP والملفات
   - محوّلات ERP وأحداث الأعمال

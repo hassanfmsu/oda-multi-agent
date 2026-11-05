@@ -3,12 +3,12 @@ title: Oracle Digital Assistant
 summary: Conversational assistants for employees and customers on the web, Microsoft Teams and messaging channels.
 pillar: oracle
 icon: chat
-order: 8
+order: 9
 highlights:
   - Custom skills & digital assistants
   - Multi-agent designs with large language models
   - Integration with Fusion & back-office systems
-  - Arabic and English conversations
+  - Conversations in Arabic, English and other languages
 ---
 
 ## What we do
@@ -22,6 +22,6 @@ Oracle Digital Assistant (ODA) lets employees and customers get things done thro
 - Multi-agent designs: router, supervisor and reflection patterns
 - Channels for the web, Microsoft Teams and messaging apps
 
-## Arabic and English
+## Arabic, English and more
 
-We design conversations that work in both languages, so every user is served in the language they prefer.
+We design conversations that work in Arabic, English and the other languages your users speak, so every user is served in the language they prefer.

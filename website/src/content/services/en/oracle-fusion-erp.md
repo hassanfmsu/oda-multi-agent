@@ -3,7 +3,7 @@ title: Oracle Fusion Cloud ERP
 summary: Implement, extend and optimise Fusion Financials, Procurement, Project Management and Supply Chain.
 pillar: oracle
 icon: erp
-order: 4
+order: 5
 highlights:
   - Implementation & configuration
   - Data migration (FBDI)

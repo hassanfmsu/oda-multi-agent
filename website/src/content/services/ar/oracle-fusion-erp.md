@@ -3,7 +3,7 @@ title: Oracle Fusion Cloud ERP
 summary: تنفيذ وتوسيع وتحسين وحدات Fusion للمالية والمشتريات وإدارة المشاريع وسلسلة الإمداد.
 pillar: oracle
 icon: erp
-order: 4
+order: 5
 highlights:
   - التنفيذ والإعداد
   - ترحيل البيانات (FBDI)

@@ -23,6 +23,13 @@ export const en = {
   platforms: {
     title: 'Platforms we work with',
     items: [
+      'OCI Generative AI',
+      'Oracle AI Data Platform',
+      'Microsoft Azure AI',
+      'Google Gemini',
+      'OpenAI',
+      'Anthropic Claude',
+      'Meta Llama',
       'Oracle Fusion Cloud ERP',
       'Oracle Integration',
       'Oracle APEX',
@@ -30,35 +37,34 @@ export const en = {
       'Oracle Cloud Infrastructure',
       'Autonomous Database',
       'Oracle Digital Assistant',
-      'OCI Generative AI',
     ],
   },
 
   home: {
     title: 'AI and Oracle Cloud Services in Saudi Arabia & the Middle East',
     description:
-      'Tx delivers AI solutions and Oracle services, including Fusion Cloud ERP, Oracle Integration, PaaS, OCI and Oracle Digital Assistant, for organisations in Saudi Arabia and the Middle East.',
+      'Tx delivers AI solutions on any major AI platform, plus Oracle services including Fusion Cloud ERP, Oracle Integration, PaaS, OCI and Oracle Digital Assistant, for organisations in Saudi Arabia and the Middle East.',
     eyebrow: 'AI · Oracle Cloud · Integration',
     heading: 'AI and Oracle Cloud, delivered with',
     headingAccent: 'Technology eXcellence',
     lead:
-      'Tx helps organisations in Saudi Arabia and across the Middle East put AI to work and get more from Oracle, from Fusion Cloud ERP and Oracle Integration to OCI and Oracle Digital Assistant.',
+      'Tx helps organisations in Saudi Arabia and across the Middle East put AI to work, in any language and on any major AI platform, and get more from Oracle, from Fusion Cloud ERP and Oracle Integration to OCI and Oracle Digital Assistant.',
     primaryCta: 'Start a conversation',
     secondaryCta: 'Explore our services',
-    points: ['Arabic & English AI', 'Oracle implementation', 'Managed support'],
+    points: ['AI in every language', 'Any major AI platform', 'Oracle implementation & support'],
     stack: [
-      { label: 'Experience & AI', chips: ['Digital Assistant', 'Generative AI', 'AI Agents'] },
+      { label: 'AI', chips: ['AI Assistants', 'AI Agents', 'AI Data Platform'] },
       { label: 'Applications & Integration', chips: ['Fusion Cloud ERP', 'Oracle Integration', 'APEX · Visual Builder'] },
       { label: 'Infrastructure', chips: ['OCI', 'Autonomous Database', 'Security & DevOps'] },
     ],
-    stackCaption: 'One team across AI and the full Oracle stack',
+    stackCaption: 'One team across AI, data and the full Oracle stack',
 
     practices: {
       eyebrow: 'What we do',
       heading: 'Two practices. One team.',
       lead:
         'Use us for a single project or across your whole landscape. Our AI and Oracle specialists work side by side, so your AI stays connected to the systems that run your business.',
-      ai: 'Assistants, agents and AI strategy that turn your data and documents into real results.',
+      ai: 'Assistants, agents, data platforms and AI strategy that turn your data and documents into real results, in every language, on OCI, Microsoft Azure, Google Cloud, AWS or open-source models.',
       oracle: 'Implementation, integration and support across Oracle SaaS, PaaS and OCI.',
       viewAll: 'View all services',
     },
@@ -75,7 +81,7 @@ export const en = {
         },
         {
           title: 'Secure by design',
-          text: 'Solutions that can run in your own OCI tenancy, under your access controls and audit trail.',
+          text: 'Solutions that run in your own cloud tenancy, on OCI or another cloud, under your access controls and audit trail.',
         },
         {
           title: 'From pilot to production',
@@ -88,7 +94,7 @@ export const en = {
       eyebrow: 'Built for the region',
       heading: 'Made for Saudi Arabia and the Middle East.',
       points: [
-        { title: 'Arabic and English', text: 'AI assistants and user experiences that work naturally in both languages.' },
+        { title: 'Every language', text: 'AI assistants that work naturally in Arabic, English and any other language your customers and employees speak.' },
         { title: 'Data residency', text: 'Solutions that can keep your data in the Kingdom using in-country OCI cloud regions.' },
         { title: 'Regulation-aware', text: 'Designed with the Personal Data Protection Law (PDPL) and national cybersecurity requirements in mind.' },
         { title: 'Vision 2030', text: 'Helping organisations modernise their operations as part of the Kingdom’s digital transformation.' },
@@ -143,11 +149,11 @@ export const en = {
   services: {
     title: 'Services',
     description:
-      'AI solutions and Oracle services from Tx: generative AI assistants, AI agents, AI strategy, Fusion Cloud ERP, Oracle Integration, PaaS, OCI and Oracle Digital Assistant.',
+      'AI solutions and Oracle services from Tx: generative AI assistants, AI agents, AI data platform, AI strategy, Fusion Cloud ERP, Oracle Integration, PaaS, OCI and Oracle Digital Assistant.',
     eyebrow: 'Services',
     heading: 'From the general ledger to generative AI.',
-    lead: 'Eight services in two practices, delivered by one team.',
-    aiLead: 'Put AI to work on your data, documents and processes.',
+    lead: 'Nine services in two practices, delivered by one team.',
+    aiLead: 'Put AI to work on your data, documents and processes, in every language and on the AI platform that fits you.',
     oracleLead: 'Implement, connect, extend and run Oracle Cloud.',
     learnMore: 'Learn more',
     included: 'What’s included',
@@ -166,14 +172,14 @@ export const en = {
     heading: 'Technology eXcellence is in our name.',
     intro: [
       'Tx is a technology consultancy focused on AI and Oracle, serving organisations in Saudi Arabia and across the Middle East.',
-      'Our team combines business process knowledge with technical depth in Oracle Fusion Cloud ERP, Oracle Integration, PaaS, OCI and AI. You work with one team that understands the whole picture, not just one layer of it.',
+      'Our team combines business process knowledge with technical depth in AI, data platforms, Oracle Fusion Cloud ERP, Oracle Integration, PaaS and OCI. Our AI work is platform-neutral: we build on OCI, Microsoft Azure, Google Cloud, AWS or open-source models, whichever fits your needs. You work with one team that understands the whole picture, not just one layer of it.',
     ],
     nameTitle: 'What the name means',
     nameT: 'Technology',
     nameX: 'eXcellence',
     principlesHeading: 'How we work',
     principles: [
-      { title: 'Focused on Oracle and AI', text: 'We specialise, so you don’t have to explain the platform to us.' },
+      { title: 'Specialists in AI and Oracle', text: 'We specialise, so you don’t have to explain the platform to us, and we choose the AI platform that fits you, not just one vendor.' },
       { title: 'End-to-end', text: 'From ERP processes to cloud infrastructure and AI, all in one team.' },
       { title: 'Accountable', text: 'The people who design your solution stay involved in building and supporting it.' },
       { title: 'Knowledge transfer', text: 'We document what we build and train your team, so you are never locked in.' },

@@ -7,6 +7,7 @@ order: 3
 highlights:
   - AI readiness assessment
   - Use-case discovery and business case
+  - Vendor-neutral platform and model selection
   - Responsible AI and data governance
   - Plan from proof of concept to production
 ---
@@ -20,6 +21,7 @@ Many organisations have more AI ideas than they can deliver. We help you choose 
 - Workshops to find AI use cases and rank them by value and effort
 - Assessment of data quality, security and integration readiness
 - Governance: policies, access control, monitoring and human oversight
+- Independent, vendor-neutral advice on AI platforms and models: OCI, Microsoft Azure, Google Cloud, AWS or open-source
 - A roadmap with clear first steps, costs and measures of success
 
 ## Built for local requirements

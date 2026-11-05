@@ -3,7 +3,7 @@ title: Oracle Cloud Infrastructure (OCI)
 summary: صمّم أعمالك على OCI وانقلها إليه وشغّلها بأمان وبتكلفة مدروسة.
 pillar: oracle
 icon: cloud
-order: 7
+order: 8
 highlights:
   - مناطق الهبوط (Landing Zones) والشبكات
   - ترحيل التطبيقات وقواعد البيانات

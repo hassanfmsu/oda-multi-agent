@@ -3,7 +3,7 @@ title: Oracle Cloud Infrastructure (OCI)
 summary: Design, migrate and run secure, cost-efficient workloads on OCI.
 pillar: oracle
 icon: cloud
-order: 7
+order: 8
 highlights:
   - Landing zones & networking
   - Application & database migration

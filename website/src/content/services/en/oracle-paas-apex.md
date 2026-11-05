@@ -3,7 +3,7 @@ title: Oracle PaaS & Extensions
 summary: Extend Fusion without customising it, using Oracle APEX, Visual Builder and Autonomous Database.
 pillar: oracle
 icon: paas
-order: 6
+order: 7
 highlights:
   - Oracle APEX applications
   - Visual Builder (VBCS) extensions

@@ -3,7 +3,7 @@ title: Oracle PaaS والتوسعات
 summary: وسّع Fusion دون تخصيصه، باستخدام Oracle APEX وVisual Builder وAutonomous Database.
 pillar: oracle
 icon: paas
-order: 6
+order: 7
 highlights:
   - تطبيقات Oracle APEX
   - توسعات Visual Builder (VBCS)
