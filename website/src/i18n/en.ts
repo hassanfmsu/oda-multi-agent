@@ -41,43 +41,43 @@ export const en = {
   },
 
   home: {
-    title: 'AI and Oracle Cloud Services in Saudi Arabia & the Middle East',
+    title: 'AI in Your Business: AI Solutions for Saudi Arabia & the Middle East',
     description:
-      'Tx delivers AI solutions on any major AI platform, plus Oracle services including Fusion Cloud ERP, Oracle Integration, PaaS, OCI and Oracle Digital Assistant, for organisations in Saudi Arabia and the Middle East.',
-    eyebrow: 'AI · Oracle Cloud · Integration',
-    heading: 'AI and Oracle Cloud, delivered with',
-    headingAccent: 'Technology eXcellence',
+      'Tx brings AI into your business: assistants, agents and data platforms in every language, on any major AI platform, connected to the systems you already run. Deep Oracle expertise. Saudi Arabia and the Middle East.',
+    eyebrow: 'AI Solutions · Data Platforms · Automation',
+    heading: 'Put AI to work',
+    headingAccent: 'in your business',
     lead:
-      'Tx helps organisations in Saudi Arabia and across the Middle East put AI to work, in any language and on any major AI platform, and get more from Oracle, from Fusion Cloud ERP and Oracle Integration to OCI and Oracle Digital Assistant.',
+      'Tx helps organisations in Saudi Arabia and across the Middle East bring AI into everyday work: assistants that answer, agents that act and data platforms that make it possible. In every language, on any major AI platform, and connected to the systems you already run, including Oracle.',
     primaryCta: 'Start a conversation',
     secondaryCta: 'Explore our services',
-    points: ['AI in every language', 'Any major AI platform', 'Oracle implementation & support'],
+    points: ['AI in every language', 'Any major AI platform', 'Connected to your systems'],
     stack: [
       { label: 'AI', chips: ['AI Assistants', 'AI Agents', 'AI Data Platform'] },
-      { label: 'Applications & Integration', chips: ['Fusion Cloud ERP', 'Oracle Integration', 'APEX · Visual Builder'] },
-      { label: 'Infrastructure', chips: ['OCI', 'Autonomous Database', 'Security & DevOps'] },
+      { label: 'Your business systems', chips: ['ERP', 'CRM', 'HR', 'Documents'] },
+      { label: 'Cloud & integration', chips: ['Oracle Integration', 'OCI', 'Azure · Google Cloud · AWS'] },
     ],
-    stackCaption: 'One team across AI, data and the full Oracle stack',
+    stackCaption: 'AI connected to the systems that run your business',
 
     practices: {
       eyebrow: 'What we do',
       heading: 'Two practices. One team.',
       lead:
-        'Use us for a single project or across your whole landscape. Our AI and Oracle specialists work side by side, so your AI stays connected to the systems that run your business.',
+        'AI is what we do. Our Oracle expertise is how we connect it to the finance, procurement and operations systems your business already runs on.',
       ai: 'Assistants, agents, data platforms and AI strategy that turn your data and documents into real results, in every language, on OCI, Microsoft Azure, Google Cloud, AWS or open-source models.',
       oracle: 'Implementation, integration and support across Oracle SaaS, PaaS and OCI.',
       viewAll: 'View all services',
     },
 
     together: {
-      eyebrow: 'Why AI and Oracle together',
+      eyebrow: 'Why Tx',
       heading: 'AI that works with your systems, not beside them.',
       text:
-        'Most AI pilots stall when they reach real business data. Because we also implement and run the Oracle systems behind your finance, procurement and operations, we can connect AI to them securely, from the first pilot to production.',
+        'Most AI pilots stall when they reach real business data. We build the AI and we connect it to the systems that run your business, Oracle or otherwise, securely, from the first pilot to production.',
       points: [
         {
           title: 'Connected to your data',
-          text: 'Assistants and agents that read from, and act in, Fusion ERP, your documents and your other systems.',
+          text: 'Assistants and agents that read from, and act in, your ERP, CRM, documents and other systems.',
         },
         {
           title: 'Secure by design',
@@ -102,7 +102,7 @@ export const en = {
     },
 
     cta: {
-      heading: 'Let’s talk about your AI and Oracle roadmap.',
+      heading: 'Let’s talk about AI in your business.',
       text: 'Tell us where you are today, and we’ll suggest a practical next step.',
       button: 'Contact us',
     },
@@ -117,20 +117,20 @@ export const en = {
       {
         tag: 'Implementation',
         title: 'Projects, from discovery to go-live',
-        text: 'New Fusion ERP rollouts, integration programmes, OCI migrations and AI pilots, delivered with clear scope, milestones and ownership.',
+        text: 'AI pilots and rollouts, data platforms, integration programmes, Fusion ERP projects and cloud migrations, delivered with clear scope, milestones and ownership.',
         points: ['Fit-gap & solution design', 'Build, test & data migration', 'Training, cutover & hypercare'],
       },
       {
         tag: 'Support',
         title: 'Managed support for live systems',
-        text: 'A dedicated team for your Oracle applications, integrations and cloud infrastructure, so issues get fixed and the platform keeps improving.',
+        text: 'A dedicated team for your AI solutions, Oracle applications, integrations and cloud infrastructure, so issues get fixed and the platform keeps improving.',
         points: ['Incidents, service & change requests', 'Quarterly update readiness', 'Integration & infrastructure monitoring'],
       },
       {
         tag: 'Advisory',
         title: 'Assessments & roadmaps',
-        text: 'Independent health checks and architecture reviews that help you get more from your existing Oracle and AI investments.',
-        points: ['ERP & integration health checks', 'Cloud & AI readiness', 'Architecture & roadmap'],
+        text: 'Independent health checks and architecture reviews that help you get more from your existing AI, data and Oracle investments.',
+        points: ['AI readiness & use-case assessment', 'Data, ERP & integration health checks', 'Architecture & roadmap'],
       },
     ],
   },
@@ -151,10 +151,10 @@ export const en = {
     description:
       'AI solutions and Oracle services from Tx: generative AI assistants, AI agents, AI data platform, AI strategy, Fusion Cloud ERP, Oracle Integration, PaaS, OCI and Oracle Digital Assistant.',
     eyebrow: 'Services',
-    heading: 'AI and Oracle Cloud, end to end.',
-    lead: 'Nine services in two practices, delivered by one team.',
+    heading: 'AI in your business, end to end.',
+    lead: 'AI services first, then the Oracle services that connect AI to your core systems. Nine services, one team.',
     aiLead: 'Put AI to work on your data, documents and processes, in every language and on the AI platform that fits you.',
-    oracleLead: 'Implement, connect, extend and run Oracle Cloud.',
+    oracleLead: 'The core systems and integrations that AI builds on: implement, connect, extend and run Oracle Cloud.',
     learnMore: 'Learn more',
     included: 'What’s included',
     discussHeading: 'Have a project in mind?',
@@ -167,11 +167,11 @@ export const en = {
   about: {
     title: 'About Tx',
     description:
-      'Tx (Technology eXcellence) is an AI and Oracle consultancy serving Saudi Arabia and the Middle East.',
+      'Tx (Technology eXcellence) is an AI consultancy for businesses in Saudi Arabia and the Middle East, with deep Oracle expertise.',
     eyebrow: 'About Tx',
     heading: 'Technology eXcellence is in our name.',
     intro: [
-      'Tx is a technology consultancy focused on AI and Oracle, serving organisations in Saudi Arabia and across the Middle East.',
+      'Tx is an AI consultancy for businesses in Saudi Arabia and across the Middle East. We bring AI into everyday work, and we have the Oracle and integration expertise to connect it to the systems you already run.',
       'Our team combines business process knowledge with technical depth in AI, data platforms, Oracle Fusion Cloud ERP, Oracle Integration, PaaS and OCI. Our AI work is platform-neutral: we build on OCI, Microsoft Azure, Google Cloud, AWS or open-source models, whichever fits your needs. You work with one team that understands the whole picture, not just one layer of it.',
     ],
     nameTitle: 'What the name means',
@@ -179,7 +179,7 @@ export const en = {
     nameX: 'eXcellence',
     principlesHeading: 'How we work',
     principles: [
-      { title: 'Specialists in AI and Oracle', text: 'We specialise, so you don’t have to explain the platform to us, and we choose the AI platform that fits you, not just one vendor.' },
+      { title: 'AI first', text: 'Every engagement starts with the business result AI can deliver, then the technology to deliver it, on whichever platform fits you.' },
       { title: 'End-to-end', text: 'From ERP processes to cloud infrastructure and AI, all in one team.' },
       { title: 'Accountable', text: 'The people who design your solution stay involved in building and supporting it.' },
       { title: 'Knowledge transfer', text: 'We document what we build and train your team, so you are never locked in.' },
@@ -190,9 +190,9 @@ export const en = {
     title: 'Contact',
     description: 'Contact Tx about AI solutions and Oracle services in Saudi Arabia and the Middle East.',
     eyebrow: 'Contact',
-    heading: 'Let’s talk about your AI and Oracle roadmap.',
+    heading: 'Let’s talk about AI in your business.',
     lead:
-      'Planning a Fusion rollout, connecting systems, moving to OCI or exploring AI? Tell us where you are and we’ll get back to you.',
+      'Exploring AI, building a data platform, connecting systems or planning an Oracle project? Tell us where you are and we’ll get back to you.',
     details: {
       email: 'Email',
       phone: 'Phone',
@@ -250,7 +250,7 @@ export const en = {
   },
 
   footer: {
-    blurb: 'AI solutions and Oracle services for Saudi Arabia and the Middle East.',
+    blurb: 'AI in your business, connected to the systems you run. Serving Saudi Arabia and the Middle East.',
     company: 'Company',
     rights: 'All rights reserved.',
     cr: 'CR No.',
