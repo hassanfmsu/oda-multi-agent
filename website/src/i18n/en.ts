@@ -151,7 +151,7 @@ export const en = {
     description:
       'AI solutions and Oracle services from Tx: generative AI assistants, AI agents, AI data platform, AI strategy, Fusion Cloud ERP, Oracle Integration, PaaS, OCI and Oracle Digital Assistant.',
     eyebrow: 'Services',
-    heading: 'From the general ledger to generative AI.',
+    heading: 'AI and Oracle Cloud, end to end.',
     lead: 'Nine services in two practices, delivered by one team.',
     aiLead: 'Put AI to work on your data, documents and processes, in every language and on the AI platform that fits you.',
     oracleLead: 'Implement, connect, extend and run Oracle Cloud.',
